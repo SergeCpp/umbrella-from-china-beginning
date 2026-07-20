@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="robots"   content="noindex">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Archive – Umbrella from China still touches as new</title>
+  <link rel="icon" type="image/jpeg" sizes="192x192" href="/images/xie-an-ran-192x192.jpg">
+  <link rel="stylesheet" type="text/css" media="all" href="/style.css">
+
+  <style>
+    body {
+    /*font-family: monospace; */
+      font-family: sans-serif;
+      padding: 1em;
+    }
+    .item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center; /* Vertically center title and stats */
+      margin: 0.5em 0;
+      padding: 0.2em 0;
+    }
+    .item-title {
+      flex: 1 1 67%; /* Title takes ~67% width */
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .item-stats-container {
+      flex: 1 1 33%;
+      text-align: right;
+      font-family: monospace; /* Monospaced font for alignment */
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end; /* Right-align all stats */
+      white-space: pre; /* Preserve spacing */
+    }
+    .item-stat-main {
+      font-weight: normal;
+    }
+    .item-stat-23,
+    .item-stat-7 {
+      color: #696969; /* DimGray, L41 */
+    }
+    .item-wrapper {
+      margin: 0.2em 0; /* Reduced vertical spacing */
+      padding-bottom: 0.2em;
+      border-bottom-color: #ebebeb; /* Gray92 */
+      border-bottom-style: solid;
+      border-bottom-width: medium;
+    }
+    .item-wrapper:last-child {
+      border-bottom: none; /* Remove line after last item */
+    }
+  </style>
+</head>
+
+<body>
+<header class="header">
+  <a href="/">&#x2602;&#xFE0F;</a> <!-- Umbrella opened -->
+  <nav class="header-nav">
+    <a href="/chinese-songs">Chinese Songs</a>
+    <a href="/lingyuan-yousa-songs">Lingyuan Yousa</a>
+    <a href="/liu-keyi-songs">Liu Keyi</a>
+    <a href="/ren-ran-songs">Ren Ran</a>
+    <a href="/tang-yufei-songs">Tang Yufei</a>
+    <a href="/wang-ziyu-songs">Wang Ziyu</a>
+    <a href="/zhao-fangjing-songs">Zhao Fangjing</a>
+  </nav>
+  <a href="/">&#x1F302;&#xFE0F;</a> <!-- Umbrella closed -->
+</header>
+
+<p class ="text-center"><a
+   target="_blank"
+   rel   ="nofollow"
+   href  ="https://archive.org/advancedsearch.php
+?q=uploader:sergecpp+AND+NOT+uploader:for_sergecpp
+&amp;fl[]=identifier&amp;fl[]=title&amp;fl[]=mediatype
+&amp;fl[]=item_size&amp;fl[]=creator&amp;fl[]=collection
+&amp;fl[]=publicdate&amp;fl[]=indexdate&amp;fl[]=reviewdate&amp;fl[]=date
+&amp;fl[]=downloads&amp;fl[]=month&amp;fl[]=week
+&amp;sort[]=publicdate+desc&amp;rows=839&amp;page=1
+&amp;callback=callback&amp;output=xml">Internet Archive Query</a></p>
+
+<!--
+https://archive.org/advancedsearch.php
+?q=uploader:sergecpp+AND+NOT+uploader:for_sergecpp
+&fl[]=identifier&fl[]=title&fl[]=mediatype
+&fl[]=item_size&fl[]=creator&fl[]=collection
+&fl[]=publicdate&fl[]=indexdate&fl[]=reviewdate&fl[]=date
+&fl[]=downloads&fl[]=month&fl[]=week
+&sort[]=publicdate+desc&rows=839&page=1
+&callback=callback&output=xml
+-->
+
+<h2 class="text-center">Items Sorted by Views/Day</h2>
+
+<div id="results"><div class="text-center text-comment">Loading...</div></div>
+
+<script>
+const XML_URL = "/archive/archive-org-sergecpp-2025-07-21.xml.txt";
+
+fetch(XML_URL)
+  .then(response => {
+      if (!response.ok) throw new Error("XML file not found");
+      return response.text();
+  })
+  .then(text => {
+      const parser = new DOMParser();
+      const xml    = parser.parseFromString(text, "text/xml");
+
+      if (xml.querySelector("parsererror")) {
+        throw new Error("Invalid XML format");
+      }
+
+      const items = [...xml.querySelectorAll("doc")];
+
+      const date_min = new Date(Date.UTC(2022, 4, 6, 00, 00, 00)); // 2022-05-06 (UTC, months are 0-based)
+      const date_max = new Date(Date.UTC(2025, 2, 8, 23, 59, 59)); // 2025-03-08 (UTC, months are 0-based)
+
+      const filteredItems = items
+        .filter(doc => {
+          const publicdate_node = doc.querySelector("str[name='publicdate']");
+          const downloads_node  = doc.querySelector("str[name='downloads']" );
+          const month_node      = doc.querySelector("str[name='month']"     );
+          const week_node       = doc.querySelector("str[name='week']"      );
+          const mediatype_node  = doc.querySelector("str[name='mediatype']" );
+
+          if (!publicdate_node || !downloads_node || !month_node || !week_node || !mediatype_node) return false;
+
+          const publicdate = new Date(publicdate_node.textContent);
+          if (isNaN(publicdate.getTime())) return false;
+          const date_ok = (publicdate >= date_min) && (publicdate <= date_max);
+
+          const downloads = parseInt(downloads_node.textContent, 10);
+          const month     = parseInt(month_node    .textContent, 10);
+          const week      = parseInt(week_node     .textContent, 10);
+          if (isNaN(downloads) || isNaN(month) || isNaN(week)) return false;
+          if ((downloads < month) || (month < week)) return false;
+
+          const is_collection = mediatype_node.textContent === "collection";
+          const is_texts      = mediatype_node.textContent === "texts";
+
+          return date_ok && !is_collection && !is_texts;
+      });
+
+      const mediatypeCounts = { movies: 0, audio: 0 };
+      filteredItems.forEach(doc => {
+        const mediatype_node = doc.querySelector("str[name='mediatype']");
+        const mediatype = mediatype_node.textContent;
+        if (mediatype === "movies") mediatypeCounts.movies++;
+        if (mediatype === "audio" ) mediatypeCounts.audio++;
+      });
+
+      // Calculate views/day
+      const results = filteredItems.map(doc => {
+        const publicdate = new Date(doc.querySelector("str[name='publicdate']").textContent);
+        const downloads  = parseInt(doc.querySelector("str[name='downloads']" ).textContent, 10);
+        const month      = parseInt(doc.querySelector("str[name='month']"     ).textContent, 10);
+        const week       = parseInt(doc.querySelector("str[name='week']"      ).textContent, 10);
+
+        const now        = new Date();
+        const _days_old  = Math.floor((now - publicdate) / (24 * 60 * 60 * 1000)) - 30;
+        const _views_old = downloads - month;
+        const _ratio_old = parseFloat((_views_old / _days_old).toFixed(3));
+
+        return {
+          title    : doc.querySelector("str[name='title']")?.textContent || "Untitled",
+          views_old: _views_old,
+          days_old : _days_old,
+          ratio_old: _ratio_old,
+          views_23 :  month - week,
+          ratio_23 : (month - week) / 23,
+          views_7  : week,
+          ratio_7  : week / 7
+        };
+      });
+
+      // Sort by views/day descending
+      results.sort((a, b) => {
+        if (a.ratio_old !== b.ratio_old) { return b.ratio_old - a.ratio_old; }
+        if (a.ratio_23  !== b.ratio_23 ) { return b.ratio_23  - a.ratio_23;  }
+        if (a.ratio_7   !== b.ratio_7  ) { return b.ratio_7   - a.ratio_7;   }
+        return a.title.localeCompare(b.title);
+      });
+
+      // Display results
+      const container = document.getElementById("results");
+      container.innerHTML = ""; // Clear loading text
+
+      // Show mediatype totals
+      const total = mediatypeCounts.movies + mediatypeCounts.audio;
+      const countDiv = document.createElement("div");
+      countDiv.className = "text-center";
+      countDiv.style.fontWeight = "bold";
+      countDiv.textContent = `Total: ${total} (Movies: ${mediatypeCounts.movies}, Audio: ${mediatypeCounts.audio})`;
+      container.appendChild(countDiv);
+
+      // Show no results message if empty
+      if (results.length === 0) {
+        container.innerHTML = '<div class="text-center text-comment">No items matched the filters</div>';
+        return;
+      }
+
+      // Show item list with flex alignment
+      results.forEach((item, index) => {
+        // 1. Outer wrapper (for spacing/divider)
+        const wrapper = document.createElement("div");
+        wrapper.className = "item-wrapper";
+
+        // 2. Inner flex container
+        const inner = document.createElement("div");
+        inner.className = "item";
+
+        // 3. Title
+        const title = document.createElement("div");
+        title.className   = "item-title";
+        title.textContent = (index + 1) + ". " + item.title;
+
+        // 4. Stats container (stacked)
+        const statsContainer = document.createElement("div");
+        statsContainer.className = "item-stats-container";
+
+        // 5. Main stat line
+        const mainStat = document.createElement("div");
+        mainStat.className   ="item-stat-main";
+        mainStat.textContent = item.views_old.toString() + " /" +
+                               item.days_old .toString().padStart(5) + " =" +
+                               item.ratio_old.toFixed(3).padStart(7);
+
+        // 6. 23-day stat line
+        const stat23 = document.createElement("div");
+        stat23.className   ="item-stat-23";
+        stat23.textContent = item.views_23.toString() + " /   23 =" +
+                             item.ratio_23.toFixed(3).padStart(7);
+
+        // 7. 7-day stat line
+        const stat7 = document.createElement("div");
+        stat7.className   ="item-stat-7";
+        stat7.textContent = item.views_7.toString() + " /    7 =" +
+                            item.ratio_7.toFixed(3).padStart(7);
+
+        // 8. Assemble the hierarchy
+        statsContainer.appendChild(mainStat);
+        statsContainer.appendChild(stat23);
+        statsContainer.appendChild(stat7);
+
+        inner.appendChild(title);
+        inner.appendChild(statsContainer); // Add stats container to inner flex
+
+        wrapper  .appendChild(inner  ); // Add inner flex to wrapper
+        container.appendChild(wrapper); // Add wrapper to the page
+      });
+  })
+  .catch(err => {
+    document.getElementById("results").innerHTML =
+      '<div class="text-center text-comment">Error: ' + err.message + '</div>';
+  });
+</script>
+
+<p class="text-center"><i>Best wishes to all! Be happy!</i></p>
+
+</body>
+</html>
+
+
+
+
+
+
