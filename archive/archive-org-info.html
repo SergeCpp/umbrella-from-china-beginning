@@ -16,8 +16,8 @@
       display: flex;
       justify-content: space-between;
       align-items: center; /* Vertically center title and stats */
-      margin: 0.5em 0;
-      padding: 0.2em 0;
+      margin-top: 0.1em;
+      padding-top: 0.1em;
     }
     .item-title {
       flex: 1 1 67%; /* Title takes ~67% width */
@@ -42,8 +42,7 @@
       color: #696969; /* DimGray, L41 */
     }
     .item-wrapper {
-      margin: 0.2em 0; /* Reduced vertical spacing */
-      padding-bottom: 0.2em;
+      margin-top: 0.1em;
       border-bottom-color: #ebebeb; /* Gray92 */
       border-bottom-style: solid;
       border-bottom-width: medium;
@@ -98,31 +97,31 @@ https://archive.org/advancedsearch.php
 stats base curr
 -->
 
-<div class  ="text-center" style="margin: 1em 0;"><label>Archived&nbsp;<input
+<div class  ="text-center" style="margin: 0.5em 0;"><label
+     style  ="margin-right:1em">Archived&nbsp;<input
      id     ="archived-min" minlength="10" maxlength="10" size ="5"
-     type   ="text" value="2022-05-06"></label><label>&nbsp;TO&nbsp;<input
+     type   ="text" value="2022-05-06">&nbsp;&ndash;&nbsp;<input
      id     ="archived-max" minlength="10" maxlength="10" size ="5"
-     type   ="text" value="2025-03-08"></label>&nbsp;<button
-     onclick="process_filtered_range()">Process</button></div>
-
-<div class  ="text-center" style="margin: 1em 0;"><label>Created&nbsp;<input
+     type   ="text" value="2025-03-08"></label><label
+     style  ="margin-right:1em">Created&nbsp;<input
      id     ="created-min" minlength="10" maxlength="10" size ="5"
-     type   ="text" value="2012-01-01"></label><label>&nbsp;TO&nbsp;<input
+     type   ="text" value="2012-01-01">&nbsp;&ndash;&nbsp;<input
      id     ="created-max" minlength="10" maxlength="10" size ="5"
-     type   ="text" value="2024-10-19"></label>&nbsp;<button
+     type   ="text" value="2024-10-19"></label><button
      onclick="process_filtered_range()">Process</button></div>
 
 <!--
 creators comma-delimited
-audio video both
+favorites count
 -->
 
 <div id="results"><div class="text-center text-comment">List will be loaded with JavaScript</div></div>
 
 <script>
-let items = [];
+let   items_curr = [];
+const stats_curr = "2025-07-21";
 
-process_stats("2025-07-21");
+process_stats();
 
 function filter_items(items, archived_min, archived_max, created_min, created_max) {
   const filtered_items = items
@@ -160,12 +159,14 @@ function filter_items(items, archived_min, archived_max, created_min, created_ma
 
       const created_ok = (date >= created_min) && (date <= created_max);
 
+      // Views
       const downloads = parseInt(downloads_node.textContent, 10);
       const month     = parseInt(month_node    .textContent, 10);
       const week      = parseInt(week_node     .textContent, 10);
       if (isNaN(downloads) || isNaN(month) || isNaN(week)) return false;
       if ((downloads < month) || (month < week)) return false;
 
+      // Mediatype
       const is_collection = (mediatype === "collection");
       const is_texts      = (mediatype === "texts"     );
 
@@ -182,8 +183,8 @@ function calculate_stats(filtered_items) {
     const week       = parseInt(doc.querySelector("str[name='week']"      ) .textContent, 10);
     const mediatype  =          doc.querySelector("str[name='mediatype']" )?.textContent || "Unknown";
 
-    const now        = new Date();
-    const days_old   = Math.floor((now - publicdate) / (24 * 60 * 60 * 1000)) - 30;
+    const stats_date = new Date(stats_curr + 'T12:00:00Z');
+    const days_old   = Math.floor((stats_date - publicdate) / (24 * 60 * 60 * 1000)) - 30;
     const views_old  = downloads - month;
     const ratio_old  = parseFloat((views_old / days_old).toFixed(3));
 
@@ -231,8 +232,8 @@ function render_results(results) {
   const total = mediatypeCounts.movies + mediatypeCounts.audio;
   const countDiv = document.createElement("div");
   countDiv.className = "text-center subtitle";
-  countDiv.textContent = 'Total: ' + total +
-    ' (Audio: ' + mediatypeCounts.audio  + ', Video: ' + mediatypeCounts.movies + ')';
+  countDiv.textContent = 'Stat ' + stats_curr + ' / Total ' + total +
+    ' (Audio ' + mediatypeCounts.audio  + ' / Video ' + mediatypeCounts.movies + ')';
   container.appendChild(countDiv);
 
   // Show stats: min, 10%, 25%, 50%, 75%, 90%, max
@@ -256,13 +257,13 @@ function render_results(results) {
   const percentile75 = getPercentile(75);
   const percentile90 = getPercentile(90);
 
-  statsText.textContent = 'Min='    + min         .toFixed(3) + ' / ' +
-                          '10th='   + percentile10.toFixed(3) + ' / ' +
-                          '25th='   + percentile25.toFixed(3) + ' / ' +
-                          'Median=' + median      .toFixed(3) + ' / ' +
-                          '75th='   + percentile75.toFixed(3) + ' / ' +
-                          '90th='   + percentile90.toFixed(3) + ' / ' +
-                          'Max='    + max         .toFixed(3);
+  statsText.textContent = 'Min ' + min         .toFixed(3) + ' / ' +
+                          '10% ' + percentile10.toFixed(3) + ' / ' +
+                          '25% ' + percentile25.toFixed(3) + ' / ' +
+                          '50% ' + median      .toFixed(3) + ' / ' +
+                          '75% ' + percentile75.toFixed(3) + ' / ' +
+                          '90% ' + percentile90.toFixed(3) + ' / ' +
+                          'Max ' + max         .toFixed(3);
 
   container.appendChild(statsText);
 
@@ -353,31 +354,28 @@ function process_filtered_range() {
   }
 
   // Process
-  const filtered_items = filter_items(items, archived_min, archived_max, created_min, created_max);
+  const filtered_items = filter_items(items_curr, archived_min, archived_max, created_min, created_max);
   const results = calculate_stats(filtered_items);
   render_results(results);
 }
 
-function process_stats(stats_date) {
-const container = document.getElementById("results");
-      container.innerHTML = '<div class="text-center text-comment">Loading...</div>';
+function process_stats() {
+  const container = document.getElementById("results");
+        container.innerHTML = '<div class="text-center text-comment">Loading...</div>';
 
-const XML_URL = "/archive/archive-org-sergecpp-" + stats_date + ".xml.txt";
+  const XML_URL = "/archive/archive-org-sergecpp-" + stats_curr + ".xml.txt";
 
-fetch(XML_URL)
-  .then(response => {
-      if (!response.ok) throw new Error("XML file not found");
+  fetch(XML_URL)
+    .then(response => {
+      if (!response.ok) { throw new Error("XML file not found"); }
       return response.text();
-  })
-  .then(text => {
+    })
+    .then(text => {
       const parser = new DOMParser();
       const xml    = parser.parseFromString(text, "text/xml");
+      if   (xml.querySelector("parsererror")) { throw new Error("Invalid XML format"); }
 
-      if (xml.querySelector("parsererror")) {
-        throw new Error("Invalid XML format");
-      }
-
-      items = [...xml.querySelectorAll("doc")];
+      items_curr = [...xml.querySelectorAll("doc")];
 
       const archived_min = new Date(Date.UTC(2022, 05-1, 06, 00, 00, 00)); // 2022-05-06 (UTC, months are 0-based)
       const archived_max = new Date(Date.UTC(2025, 03-1, 08, 23, 59, 59)); // 2025-03-08 (UTC, months are 0-based)
@@ -385,15 +383,15 @@ fetch(XML_URL)
       const created_min  = new Date(Date.UTC(2012, 01-1, 01, 00, 00, 00)); // 2012-01-01 (UTC, months are 0-based)
       const created_max  = new Date(Date.UTC(2024, 10-1, 19, 23, 59, 59)); // 2024-10-19 (UTC, months are 0-based)
 
-      const filtered_items = filter_items(items, archived_min, archived_max, created_min, created_max);
+      const filtered_items = filter_items(items_curr, archived_min, archived_max, created_min, created_max);
       const results        = calculate_stats(filtered_items);
 
       render_results(results);
-  })
-  .catch(err => {
-    document.getElementById("results").innerHTML =
-      '<div class="text-center text-comment">Error: ' + err.message + '</div>';
-  });
+    })
+    .catch(err => {
+      document.getElementById("results").innerHTML =
+        '<div class="text-center text-comment">Error: ' + err.message + '</div>';
+    });
 }
 </script>
 
