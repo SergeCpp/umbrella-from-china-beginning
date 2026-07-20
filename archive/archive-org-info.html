@@ -10,29 +10,31 @@
 
   <style>
     body {
-    /*max-width: 40%; */ /* For testing */
+    /*max-width: 67%; */ /* For testing */
     }
     .item {
+      align-items: center; /* Vertically center title and stats */
       display: flex;
       justify-content: space-between;
-      align-items: center; /* Vertically center title and stats */
-      margin-top: 0.1em;
-      padding-top: 0.1em;
     }
     .item-title {
-      flex: 1 1 67%; /* Title takes ~67% width */
+      flex: 1 1 67%;
       overflow: hidden;
-      white-space: nowrap;
       text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .item-spacer {
+      flex: 0 0 1em; /* Fixed width spacer */
     }
     .item-stats-container {
-      flex: 1 1 33%;
-      text-align: right;
-      font-family: monospace; /* Monospaced font for alignment */
-      display: flex;
-      flex-direction: column;
       align-items: flex-end; /* Right-align all stats */
+      display: flex;
+      flex: 1 1 15%; /* Two such containers with spacer between, so < 70% above */
+      flex-direction: column;
+      font-family: monospace; /* Monospaced font for alignment */
+      text-align: right;
       white-space: pre; /* Preserve spacing */
+    /*background-color: #00cf00; */ /* For testing */
     }
     .item-stat-main {
       font-weight: normal;
@@ -42,13 +44,17 @@
       color: #696969; /* DimGray, L41 */
     }
     .item-wrapper {
-      margin-top: 0.1em;
+      border-top-color: white;
+      border-top-style: solid;
+      border-top-width: medium;
       border-bottom-color: #ebebeb; /* Gray92 */
       border-bottom-style: solid;
       border-bottom-width: medium;
+    /*background-color: #3f3fef; */ /* For testing */
     }
     .item-wrapper:last-child {
-      border-bottom: none; /* No line after last item */
+      border-bottom: none;
+      margin-bottom: 1rem;
     }
   </style>
 </head>
@@ -70,17 +76,17 @@
 
 <h1 class="text-center">Items Sorted by Views/Day</h1>
 
-<p class ="text-center"><a
-   target="_blank"
-   rel   ="nofollow"
-   href  ="https://archive.org/advancedsearch.php
+<div class ="text-center"><a
+     target="_blank"
+     rel   ="nofollow"
+     href  ="https://archive.org/advancedsearch.php
 ?q=uploader:sergecpp+AND+NOT+uploader:for_sergecpp
 &amp;fl[]=identifier&amp;fl[]=title&amp;fl[]=mediatype
 &amp;fl[]=item_size&amp;fl[]=creator&amp;fl[]=collection
 &amp;fl[]=publicdate&amp;fl[]=indexdate&amp;fl[]=reviewdate&amp;fl[]=date
 &amp;fl[]=downloads&amp;fl[]=month&amp;fl[]=week
 &amp;sort[]=publicdate+desc&amp;rows=839&amp;page=1
-&amp;callback=callback&amp;output=xml">Internet Archive Query</a></p>
+&amp;callback=callback&amp;output=xml">Internet Archive Query</a></div>
 
 <!--
 https://archive.org/advancedsearch.php
@@ -118,8 +124,11 @@ favorites count
 <div id="results"><div class="text-center text-comment">List will be loaded with JavaScript</div></div>
 
 <script>
-let   items_curr = [];
-const stats_curr = "2025-07-21";
+const stats_curr_date  = "2025-07-23";
+let   stats_curr_items = [];
+
+const stats_prev_date  = "2025-07-21";
+let   stats_prev_items = [];
 
 process_stats();
 
@@ -132,10 +141,13 @@ function filter_items(items, archived_min, archived_max, created_min, created_ma
       const month_node      = doc.querySelector("str[name='month']"     );
       const week_node       = doc.querySelector("str[name='week']"      );
       const mediatype_node  = doc.querySelector("str[name='mediatype']" );
+      const identifier_node = doc.querySelector("str[name='identifier']");
 
       if (!publicdate_node ||
           !downloads_node  || !month_node || !week_node ||
-          !mediatype_node) return false;
+          !mediatype_node  || !identifier_node) {
+        return false;
+      }
 
       // Archived
       const publicdate = new Date(publicdate_node.textContent);
@@ -175,16 +187,17 @@ function filter_items(items, archived_min, archived_max, created_min, created_ma
   return filtered_items;
 }
 
-function calculate_stats(filtered_items) {
+function calculate_stats(filtered_items, stats_date) {
   const results = filtered_items.map(doc => {
-    const publicdate = new Date(doc.querySelector("str[name='publicdate']") .textContent);
-    const downloads  = parseInt(doc.querySelector("str[name='downloads']" ) .textContent, 10);
-    const month      = parseInt(doc.querySelector("str[name='month']"     ) .textContent, 10);
-    const week       = parseInt(doc.querySelector("str[name='week']"      ) .textContent, 10);
-    const mediatype  =          doc.querySelector("str[name='mediatype']" )?.textContent || "Unknown";
+    const publicdate = new Date(doc.querySelector("str[name='publicdate']").textContent);
+    const downloads  = parseInt(doc.querySelector("str[name='downloads']" ).textContent, 10);
+    const month      = parseInt(doc.querySelector("str[name='month']"     ).textContent, 10);
+    const week       = parseInt(doc.querySelector("str[name='week']"      ).textContent, 10);
+    const mediatype  =          doc.querySelector("str[name='mediatype']" ).textContent;
+    const identifier =          doc.querySelector("str[name='identifier']").textContent;
 
-    const stats_date = new Date(stats_curr + 'T12:00:00Z');
-    const days_old   = Math.floor((stats_date - publicdate) / (24 * 60 * 60 * 1000)) - 30;
+    const calc_date  = new Date(stats_date + 'T12:00:00Z');
+    const days_old   = Math.floor((calc_date - publicdate) / (24 * 60 * 60 * 1000)) - 30;
     const views_old  = downloads - month;
     const ratio_old  = parseFloat((views_old / days_old).toFixed(3));
 
@@ -197,43 +210,52 @@ function calculate_stats(filtered_items) {
       ratio_23 : (month - week) / 23,
       views_7  : week,
       ratio_7  : week / 7,
-      mediatype
+      mediatype,
+      identifier
     };
   });
   return results;
 }
 
-function render_results(results) {
-  // Sort by views/day descending
-  results.sort((a, b) => {
-    if (a.ratio_old !== b.ratio_old) { return b.ratio_old - a.ratio_old; }
-    if (a.ratio_23  !== b.ratio_23 ) { return b.ratio_23  - a.ratio_23;  }
-    if (a.ratio_7   !== b.ratio_7  ) { return b.ratio_7   - a.ratio_7;   }
-    return a.title.localeCompare(b.title); // Ascending: A >> Z
-  });
-
+function render_results(results_curr, results_prev) {
   const container = document.getElementById("results");
-        container.innerHTML = ""; // Clear loading text
+        container.innerHTML = "";
 
-  // Show no results message if empty
-  if (results.length === 0) {
+  if (results_curr.length === 0) {
     container.innerHTML = '<div class="text-center text-comment">No items matched the filters</div>';
     return;
   }
 
-  // Count mediatypes from results
+  if (results_prev.length !== results_curr.length) {
+    container.innerHTML = '<div class="text-center text-comment">Stats are different in items count</div>';
+    return;
+  }
+
+  results_curr.sort((a, b) => { // Descending for views
+    if (a.ratio_old !== b.ratio_old) { return b.ratio_old - a.ratio_old; }
+    if (a.ratio_23  !== b.ratio_23 ) { return b.ratio_23  - a.ratio_23;  }
+    if (a.ratio_7   !== b.ratio_7  ) { return b.ratio_7   - a.ratio_7;   }
+    return a.title.localeCompare(b.title); // Ascending for titles: A >> Z
+  });
+
+  // Build a map of prev results by identifier
+  const map_prev = {};
+  results_prev.forEach(item => {
+    map_prev[item.identifier] = item;
+  });
+
   const mediatypeCounts = { movies: 0, audio: 0 };
-  results.forEach(item => {
+  results_curr.forEach(item => {
     if (item.mediatype === "movies") mediatypeCounts.movies++;
     if (item.mediatype === "audio" ) mediatypeCounts.audio++;
   });
 
-  // Show mediatype totals
   const total = mediatypeCounts.movies + mediatypeCounts.audio;
   const countDiv = document.createElement("div");
   countDiv.className = "text-center subtitle";
-  countDiv.textContent = 'Stat ' + stats_curr + ' / Total ' + total +
-    ' (Audio ' + mediatypeCounts.audio  + ' / Video ' + mediatypeCounts.movies + ')';
+  countDiv.textContent = 'Stats ' + stats_prev_date + ' – ' + stats_curr_date + ' / ' +
+                         'Total ' + total + ' ' +
+                        '(Audio ' + mediatypeCounts.audio  + ' / Video ' + mediatypeCounts.movies + ')';
   container.appendChild(countDiv);
 
   // Show stats: min, 10%, 25%, 50%, 75%, 90%, max
@@ -242,33 +264,33 @@ function render_results(results) {
   statsText.style.color = "#696969"; // DimGray, L41
 
   // Calculate stats from sorted results
-  const max = results[0]?.ratio_old || 0;
-  const min = results[results.length - 1]?.ratio_old || 0;
+  const max = results_curr[0                      ]?.ratio_old || 0;
+  const min = results_curr[results_curr.length - 1]?.ratio_old || 0;
 
   // Simple percentile approximations (array is already sorted)
   const getPercentile = (percent) => {
-    const index = Math.floor((100 - percent) / 100 * (results.length - 1));
-    return results[index]?.ratio_old || 0;
+    const index = Math.floor((100 - percent) / 100 * results_curr.length);
+    return results_curr[index]?.ratio_old || 0;
   };
 
   const percentile10 = getPercentile(10);
-  const percentile25 = getPercentile(25);
+  const quartile1    = getPercentile(25);
   const median       = getPercentile(50);
-  const percentile75 = getPercentile(75);
+  const quartile3    = getPercentile(75);
   const percentile90 = getPercentile(90);
 
   statsText.textContent = 'Min ' + min         .toFixed(3) + ' / ' +
                           '10% ' + percentile10.toFixed(3) + ' / ' +
-                          '25% ' + percentile25.toFixed(3) + ' / ' +
+                          '25% ' + quartile1   .toFixed(3) + ' / ' +
                           '50% ' + median      .toFixed(3) + ' / ' +
-                          '75% ' + percentile75.toFixed(3) + ' / ' +
+                          '75% ' + quartile3   .toFixed(3) + ' / ' +
                           '90% ' + percentile90.toFixed(3) + ' / ' +
                           'Max ' + max         .toFixed(3);
 
   container.appendChild(statsText);
 
   // Show item list with flex alignment
-  results.forEach((item, index) => {
+  results_curr.forEach((item, index) => {
     // 1. Outer wrapper (for spacing/divider)
     const wrapper = document.createElement("div");
     wrapper.className = "item-wrapper";
@@ -282,37 +304,77 @@ function render_results(results) {
     title.className   = "item-title";
     title.textContent = (index + 1) + ". " + item.title;
 
-    // 4. Stats container (stacked)
-    const statsContainer = document.createElement("div");
-    statsContainer.className = "item-stats-container";
+    // 4.0. Get matching prev item
+    const item_prev = map_prev[item.identifier];
 
-    // 5. Main stat line
-    const mainStat = document.createElement("div");
-    mainStat.className   ="item-stat-main";
-    mainStat.textContent = item.views_old.toString() + " /" +
-                           item.days_old .toString().padStart(5) + " =" +
-                           item.ratio_old.toFixed(3).padStart(7);
+    // 4.1. Prev stats container (stacked)
+    const stats_prev_container = document.createElement("div");
+    stats_prev_container.className = "item-stats-container";
 
-    // 6. 23-day stat line
-    const stat23 = document.createElement("div");
-    stat23.className   ="item-stat-23";
-    stat23.textContent = item.views_23.toString() + " /   23 =" +
-                         item.ratio_23.toFixed(3).padStart(7);
+    // 4.2. Prev: old stat line
+    const stat_prev_old = document.createElement("div");
+    stat_prev_old.className   ="item-stat-main";
+    stat_prev_old.textContent = item_prev.views_old.toString() + " /" +
+                                item_prev.days_old .toString().padStart(5) + " =" +
+                                item_prev.ratio_old.toFixed(3).padStart(7);
 
-    // 7. 7-day stat line
-    const stat7 = document.createElement("div");
-    stat7.className   ="item-stat-7";
-    stat7.textContent = item.views_7.toString() + " /    7 =" +
-                        item.ratio_7.toFixed(3).padStart(7);
+    // 4.3. Prev: 23-day stat line
+    const stat_prev_23 = document.createElement("div");
+    stat_prev_23.className   ="item-stat-23";
+    stat_prev_23.textContent = item_prev.views_23.toString() + " /   23 =" +
+                               item_prev.ratio_23.toFixed(3).padStart(7);
 
-    // 8. Assemble the hierarchy
-    statsContainer.appendChild(mainStat);
-    statsContainer.appendChild(stat23);
-    statsContainer.appendChild(stat7);
+    // 4.4. Prev: 7-day stat line
+    const stat_prev_7 = document.createElement("div");
+    stat_prev_7.className   ="item-stat-7";
+    stat_prev_7.textContent = item_prev.views_7.toString() + " /    7 =" +
+                              item_prev.ratio_7.toFixed(3).padStart(7);
 
+    // 4.5. Prev: assemble the hierarchy
+    stats_prev_container.appendChild(stat_prev_old);
+    stats_prev_container.appendChild(stat_prev_23 );
+    stats_prev_container.appendChild(stat_prev_7  );
+
+    // 5. Spacer between prev and curr
+    const spacer = document.createElement("div");
+    spacer.className = "item-spacer";
+  //spacer.textContent = " "; // Optional: keeps layout consistent
+
+    // 6.1. Curr stats container (stacked)
+    const stats_curr_container = document.createElement("div");
+    stats_curr_container.className = "item-stats-container";
+
+    // 6.2. Curr: old stat line
+    const stat_curr_old = document.createElement("div");
+    stat_curr_old.className   ="item-stat-main";
+    stat_curr_old.textContent = item.views_old.toString() + " /" +
+                                item.days_old .toString().padStart(5) + " =" +
+                                item.ratio_old.toFixed(3).padStart(7);
+
+    // 6.3. Curr: 23-day stat line
+    const stat_curr_23 = document.createElement("div");
+    stat_curr_23.className   ="item-stat-23";
+    stat_curr_23.textContent = item.views_23.toString() + " /   23 =" +
+                               item.ratio_23.toFixed(3).padStart(7);
+
+    // 6.4. Curr: 7-day stat line
+    const stat_curr_7 = document.createElement("div");
+    stat_curr_7.className   ="item-stat-7";
+    stat_curr_7.textContent = item.views_7.toString() + " /    7 =" +
+                              item.ratio_7.toFixed(3).padStart(7);
+
+    // 6.5. Curr: assemble the hierarchy
+    stats_curr_container.appendChild(stat_curr_old);
+    stats_curr_container.appendChild(stat_curr_23 );
+    stats_curr_container.appendChild(stat_curr_7  );
+
+    // 7. Add all parts
     inner.appendChild(title);
-    inner.appendChild(statsContainer); // Add stats container to inner flex
+    inner.appendChild(stats_prev_container); // Add prev stats container to inner flex
+    inner.appendChild(spacer);
+    inner.appendChild(stats_curr_container); // Add curr stats container to inner flex
 
+    // 8. And wrap
     wrapper  .appendChild(inner  ); // Add inner flex to wrapper
     container.appendChild(wrapper); // Add wrapper to the page
   });
@@ -354,8 +416,8 @@ function process_filtered_range() {
   }
 
   // Process
-  const filtered_items = filter_items(items_curr, archived_min, archived_max, created_min, created_max);
-  const results = calculate_stats(filtered_items);
+  const filtered_items = filter_items(stats_curr_items, archived_min, archived_max, created_min, created_max);
+  const results = calculate_stats(filtered_items, stats_curr_date);
   render_results(results);
 }
 
@@ -363,35 +425,49 @@ function process_stats() {
   const container = document.getElementById("results");
         container.innerHTML = '<div class="text-center text-comment">Loading...</div>';
 
-  const XML_URL = "/archive/archive-org-sergecpp-" + stats_curr + ".xml.txt";
+  const xml_url_curr = "/archive/archive-org-sergecpp-" + stats_curr_date + ".xml.txt";
+  const xml_url_prev = "/archive/archive-org-sergecpp-" + stats_prev_date + ".xml.txt";
 
-  fetch(XML_URL)
-    .then(response => {
-      if (!response.ok) { throw new Error("XML file not found"); }
+  Promise.all([
+    fetch(xml_url_curr).then(response => {
+      if (!response.ok) { throw new Error(stats_curr_date + " &mdash; XML file not found"); }
+      return response.text();
+    }),
+    fetch(xml_url_prev).then(response => {
+      if (!response.ok) { throw new Error(stats_prev_date + " &mdash; XML file not found"); }
       return response.text();
     })
-    .then(text => {
-      const parser = new DOMParser();
-      const xml    = parser.parseFromString(text, "text/xml");
-      if   (xml.querySelector("parsererror")) { throw new Error("Invalid XML format"); }
+  ])
+  .then(([text_curr, text_prev]) => {
+    const parser = new DOMParser();
 
-      items_curr = [...xml.querySelectorAll("doc")];
+    const xml_curr = parser.parseFromString(text_curr, "text/xml");
+    if   (xml_curr.querySelector("parsererror")) { throw new Error(stats_curr_date + " &mdash; Invalid XML format"); }
 
-      const archived_min = new Date(Date.UTC(2022, 05-1, 06, 00, 00, 00)); // 2022-05-06 (UTC, months are 0-based)
-      const archived_max = new Date(Date.UTC(2025, 03-1, 08, 23, 59, 59)); // 2025-03-08 (UTC, months are 0-based)
+    const xml_prev = parser.parseFromString(text_prev, "text/xml");
+    if   (xml_prev.querySelector("parsererror")) { throw new Error(stats_prev_date + " &mdash; Invalid XML format"); }
 
-      const created_min  = new Date(Date.UTC(2012, 01-1, 01, 00, 00, 00)); // 2012-01-01 (UTC, months are 0-based)
-      const created_max  = new Date(Date.UTC(2024, 10-1, 19, 23, 59, 59)); // 2024-10-19 (UTC, months are 0-based)
+    stats_curr_items = [...xml_curr.querySelectorAll("doc")];
+    stats_prev_items = [...xml_prev.querySelectorAll("doc")];
 
-      const filtered_items = filter_items(items_curr, archived_min, archived_max, created_min, created_max);
-      const results        = calculate_stats(filtered_items);
+    const archived_min = new Date(Date.UTC(2022, 05-1, 06, 00, 00, 00)); // 2022-05-06 (UTC, months are 0-based)
+    const archived_max = new Date(Date.UTC(2025, 03-1, 08, 23, 59, 59)); // 2025-03-08 (UTC, months are 0-based)
 
-      render_results(results);
-    })
-    .catch(err => {
-      document.getElementById("results").innerHTML =
-        '<div class="text-center text-comment">Error: ' + err.message + '</div>';
-    });
+    const created_min  = new Date(Date.UTC(2012, 01-1, 01, 00, 00, 00)); // 2012-01-01 (UTC, months are 0-based)
+    const created_max  = new Date(Date.UTC(2024, 10-1, 19, 23, 59, 59)); // 2024-10-19 (UTC, months are 0-based)
+
+    const filtered_curr_items = filter_items(stats_curr_items, archived_min, archived_max, created_min, created_max);
+    const filtered_prev_items = filter_items(stats_prev_items, archived_min, archived_max, created_min, created_max);
+
+    const results_curr        = calculate_stats(filtered_curr_items, stats_curr_date);
+    const results_prev        = calculate_stats(filtered_prev_items, stats_prev_date);
+
+    render_results(results_curr, results_prev);
+  })
+  .catch(err => {
+    document.getElementById("results").innerHTML =
+      '<div class="text-center text-comment">Error: ' + err.message + '</div>';
+  });
 }
 </script>
 
