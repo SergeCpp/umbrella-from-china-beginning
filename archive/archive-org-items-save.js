@@ -1,9 +1,13 @@
 /* Global Variables */
 
-const stat_curr_date  = "2025-07-27";
+const stat_file_dates = ["2025-07-21",
+                         "2025-07-23",
+                         "2025-07-27"];
+
+let   stat_curr_date  =  "2025-07-27";
 let   stat_curr_items = [];
 
-const stat_prev_date  = "2025-07-23";
+let   stat_prev_date  =  "2025-07-23";
 let   stat_prev_items = [];
 
 /* Startup Run */
@@ -268,7 +272,7 @@ function sort_results(results) {
   });
 }
 
-function render_stats(results, date, container) {
+function render_stats(results, date, what, container) {
   sort_results(results);
 
   // Show stats: Min, 10%, 25%, 50%, 75%, 90%, Max
@@ -292,8 +296,16 @@ function render_stats(results, date, container) {
   const quartile3    = get_percentile(75);
   const percentile90 = get_percentile(90);
 
-  stats_text.textContent =
-             date                    + ' : ' +
+  stats_text.innerHTML =
+    '<span ' +
+       'role="button" style="cursor:pointer;" tabindex="0" ' +
+       'onkeydown="if (event.key === \'Enter\' || event.key === \' \') { event.preventDefault(); }" ' +
+       'onkeyup  ="if (event.key === \'Enter\' || event.key === \' \') { ' +
+                  'date_change_menu(event, \'' + what + '\'); }" ' +
+       'onclick  ="date_change_menu(event, \'' + what + '\')" ' +
+       'data-what="'    +
+             what + '"' +
+       '>' + date + '</span>'        + ' : ' +
     'Min ' + min         .toFixed(3) + ' / ' +
     '10% ' + percentile10.toFixed(3) + ' / ' +
     '25% ' + quartile1   .toFixed(3) + ' / ' +
@@ -349,8 +361,8 @@ function render_results(results_curr, results_prev) {
   container.appendChild(counts_div);
 
   // Both stats displaying
-  render_stats(results_prev, stat_prev_date, container); // Also sorts results_prev
-  render_stats(results_curr, stat_curr_date, container); // Also sorts results_curr
+  render_stats(results_prev, stat_prev_date, "prev", container); // Also sorts results_prev
+  render_stats(results_curr, stat_curr_date, "curr", container); // Also sorts results_curr
 
   container.lastElementChild.style.marginBottom = "1em"; // Add space before item list
 
@@ -518,6 +530,8 @@ function init_controls() {
   }
 }
 
+/* Filter */
+
 function is_date_valid(year, month, day) {
   // Create date and check if it "corrects" the input
   const  date = new Date(Date.UTC(year, month - 1, day));
@@ -575,7 +589,7 @@ function parse_advanced_term(term) {
     };
   }
   // Check for NOT next
-  else if(term.substring(0, 4) === "NOT ") { // Leading NOT
+  else if (term.substring(0, 4) === "NOT ") { // Leading NOT
     return {
       type     : "NOT",
       main     : null, // Nothing from left
@@ -688,41 +702,128 @@ function process_filtered_range() {
                         'Render ' + (process_3 - process_2).toFixed(1) + ' ms';
 }
 
+/* Date Change */
+
+function date_change_menu(event, what) {
+  const rect = event.target.getBoundingClientRect();
+
+  const menu_old = document.getElementById('date-change-menu');
+  if   (menu_old) {
+    document.body.removeChild(menu_old);
+  }
+
+  const menu = document.createElement('div');
+  menu.id                    = 'date-change-menu';
+  menu.style.position        = 'absolute';
+  menu.style.left            = (rect.left + window.scrollX)       + 'px';
+  menu.style.top             = (rect.top  + window.scrollY - 134) + 'px';
+  menu.style.zIndex          = '1000';
+  menu.style.backgroundColor = '#fafafa'; // Gray98
+  menu.style.border          = '2px solid #ebebeb'; // Gray92
+  menu.style.borderRadius    = '4px';
+  menu.style.padding         = '4px';
+  menu.style.boxShadow       = '2px 2px 4px rgba(0,0,0,0.2)';
+
+  stat_file_dates.forEach(date => {
+    const date_opt = document.createElement('div');
+    date_opt.textContent        = date;
+    date_opt.style.borderRadius = '4px';
+    date_opt.style.padding      = '2px 4px';
+    date_opt.style.cursor       = 'pointer';
+    date_opt.style.color        = '#696969'; // DimGray, L41
+    date_opt.style.textAlign    = 'center';
+    date_opt.onmouseover        = () => { date_opt.style.backgroundColor = '#ebebeb'; }; // Gray92
+    date_opt.onmouseout         = () => { date_opt.style.backgroundColor = ""; };
+
+    date_opt.onclick = function() {
+      document.body.removeChild(menu);
+      reload_stat(date, what);
+    };
+    menu.appendChild(date_opt);
+  });
+
+  const close_opt = document.createElement('div');
+  close_opt.textContent        = 'Close';
+  close_opt.style.borderRadius = '4px';
+  close_opt.style.padding      = '2px 4px'; 
+  close_opt.style.cursor       = 'pointer';
+  close_opt.style.color        = '#9e9e9e'; // Gray62
+  close_opt.style.textAlign    = 'center';
+  close_opt.onmouseover        = () => { close_opt.style.backgroundColor = '#ebebeb'; }; // Gray92
+  close_opt.onmouseout         = () => { close_opt.style.backgroundColor = ""; }; 
+
+  close_opt.onclick = function() {
+    if (document.body.contains(menu)) {
+        document.body.removeChild(menu);
+    }
+  };
+  menu.appendChild(close_opt);
+
+  document.body.appendChild(menu);
+}
+
 /* Main */
+
+function load_stat_file(date) {
+  const xml_url = "/archive/archive-org-sergecpp-" + date + ".xml.txt";
+
+  return fetch(xml_url)
+    .then(response => {
+      if (!response.ok) { throw new Error(date + " &mdash; XML file not found"); }
+      return response.text();
+    })
+    .then(text => {
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, "text/xml");
+      if   (xml.querySelector("parsererror")) { throw new Error(date + " &mdash; Invalid XML format"); }
+
+      return [...xml.querySelectorAll("doc")];
+    });
+}
+
+function reload_stat(date, what) {
+  if (!stat_file_dates.includes(date)) return;
+
+  if (what === "curr") {
+    if (stat_curr_date === date) return;
+  } else { //  "prev"
+    if (stat_prev_date === date) return;
+  }
+
+  load_stat_file(date)
+    .then(loaded_items => {
+      if (what === "curr") {
+        stat_curr_items = loaded_items;
+        stat_curr_date  = date;
+      } else { //  "prev"
+        stat_prev_items = loaded_items;
+        stat_prev_date  = date;
+      }
+      process_filtered_range();
+    })
+    .catch(err => {
+      document.getElementById("results").innerHTML =
+        '<div class="text-center text-comment">Error: ' + err.message + '</div>';
+    });
+}
 
 function process_stats() {
   const container = document.getElementById("results");
         container.innerHTML = '<div class="text-center text-comment">Loading...</div>';
 
-  const xml_url_curr = "/archive/archive-org-sergecpp-" + stat_curr_date + ".xml.txt";
-  const xml_url_prev = "/archive/archive-org-sergecpp-" + stat_prev_date + ".xml.txt";
-
   Promise.all([
-    fetch(xml_url_curr).then(response => {
-      if (!response.ok) { throw new Error(stat_curr_date + " &mdash; XML file not found"); }
-      return response.text();
-    }),
-    fetch(xml_url_prev).then(response => {
-      if (!response.ok) { throw new Error(stat_prev_date + " &mdash; XML file not found"); }
-      return response.text();
-    })
+    load_stat_file(stat_curr_date),
+    load_stat_file(stat_prev_date)
   ])
-  .then(([text_curr, text_prev]) => {
-    const parser = new DOMParser();
-
-    const xml_curr = parser.parseFromString(text_curr, "text/xml");
-    if   (xml_curr.querySelector("parsererror")) { throw new Error(stat_curr_date + " &mdash; Invalid XML format"); }
-
-    const xml_prev = parser.parseFromString(text_prev, "text/xml");
-    if   (xml_prev.querySelector("parsererror")) { throw new Error(stat_prev_date + " &mdash; Invalid XML format"); }
-
-    stat_curr_items = [...xml_curr.querySelectorAll("doc")];
-    stat_prev_items = [...xml_prev.querySelectorAll("doc")];
+  .then(([loaded_curr_items, loaded_prev_items]) => {
+    stat_curr_items = loaded_curr_items;
+    stat_prev_items = loaded_prev_items;
 
     process_filtered_range();
   })
   .catch(err => {
-    container.innerHTML = '<div class="text-center text-comment">Error: ' + err.message + '</div>';
+    container.innerHTML =
+      '<div class="text-center text-comment">Error: ' + err.message + '</div>';
   });
 }
 
