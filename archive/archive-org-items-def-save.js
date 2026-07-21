@@ -2,42 +2,46 @@
 
 const stat_file_dates = ["2025-07-21",
                          "2025-07-23",
-                         "2025-07-27"];
+                         "2025-07-27",
+                         "2025-07-31"];
 
-let   stat_curr_date  =  "2025-07-27";
+let   stat_curr_date  =  "2025-07-31";
 let   stat_curr_items = [];
 
-let   stat_prev_date  =  "2025-07-23";
+let   stat_prev_date  =  "2025-07-27";
 let   stat_prev_items = [];
+
+let   du_load         = 0; // Duration of load
+let   du_parse        = 0; // Duration of parse
 
 /* Items */
 
-function evaluate_term(term_obj, values, match_fn) {
-  switch(term_obj.type) {
+function evaluate_term(term, values, matcher) {
+  switch(term.type) {
     case "AND":
-      return term_obj.terms.every(sub_term => 
-        evaluate_term(sub_term, values, match_fn));
+      return term.pair.every(part => 
+        evaluate_term(part, values, matcher));
 
     case "OR":
-      return term_obj.terms.some(sub_term => 
-        evaluate_term(sub_term, values, match_fn));
+      return term.pair.some(part => 
+        evaluate_term(part, values, matcher));
 
     case "NOT":
-      const match_incl = term_obj.incl
-                       ? evaluate_term(term_obj.incl, values, match_fn)
+      const match_incl = term.incl
+                       ? evaluate_term(term.incl, values, matcher)
                        : true; // Nothing from left (to include)
-      const match_excl = evaluate_term(term_obj.excl, values, match_fn);
+      const match_excl = evaluate_term(term.excl, values, matcher);
       return match_incl && !match_excl;
 
-    case "PLAIN":
-      return values.some(value => match_fn(value, term_obj.term));
+    case "TEXT":
+      return values.some(value => matcher(value, term.text));
 
     default:
       return false; // Unknown type
   }
 }
 
-function filter_matches(doc, field, terms, match_fn) {
+function filter_matches(doc, field, terms, matcher) {
   if (!terms)              return true; // No    filter = match all
   if  (terms.length === 0) return true; // Empty filter = match all
 
@@ -54,8 +58,8 @@ function filter_matches(doc, field, terms, match_fn) {
   }
 
   // Check if any term matches
-  return terms.some(term_obj => {
-    return evaluate_term(term_obj, values, match_fn);
+  return terms.some(term => {
+    return evaluate_term(term, values, matcher);
   });
 }
 
@@ -316,7 +320,7 @@ function render_results(results_curr, results_prev) {
 
   if ((results_curr.length === 0) && (results_prev.length === 0)) {
     container.innerHTML =
-      '<div class="text-center text-comment" style="margin-bottom: 1em;">No items matched the filters</div>';
+      '<div class="text-center text-comment">No items matched the filters</div>';
     return;
   }
 
@@ -573,62 +577,75 @@ function get_date_range(date_str) {
   return null; // Invalid format
 }
 
-function parse_advanced_term(term) {
+function parse_term(term) {
+  term = term.trim();
+
   // Check for AND first (higher precedence)
   if (term.includes(" AND ")) {
-    const terms = term.split(" AND ").map(t => parse_advanced_term(t.trim()));
+    const pair = term.split(" AND ").map(part => parse_term(part));
     return {
       type: "AND",
-      terms: terms
+      pair: pair
     };
   }
   // Check for NOT next
   else if (term.substring(0, 4) === "NOT ") { // Leading NOT
+    const excl = term.substring(4);
     return {
       type: "NOT",
       incl: null, // Nothing from left (to include)
-      excl: parse_advanced_term(term.substring(4).trim())
+      excl: parse_term(excl)
     }
   } else if (term.includes(" NOT ")) {
     const [incl, excl] = term.split(" NOT ");
     return {
       type: "NOT",
-      incl: parse_advanced_term(incl.trim()),
-      excl: parse_advanced_term(excl.trim())
+      incl: parse_term(incl),
+      excl: parse_term(excl)
     };
   }
   // Check for OR next
   else if (term.includes(" OR ")) {
-    const terms = term.split(" OR ").map(t => parse_advanced_term(t.trim()));
+    const pair = term.split(" OR ").map(part => parse_term(part));
     return {
       type: "OR",
-      terms: terms
+      pair: pair
     };
   }
-  // Plain term (OR behavior of comma-separated terms)
+  // Plain text term (OR behavior of comma-separated terms)
   else {
     return {
-      type: "PLAIN",
-      term: term.replace(/"/g, "") // " Allows leading/trailing space, also " " possible for term
+      type: "TEXT",
+      text: term.replace(/['"]/g, "") // Quote allows leading/trailing space, also ' ' possible for term
     };
   }
 }
 
-function clean_filter_input(input) {
+function input_clean_parse(input) {
   return input
     .replace(/  +/g, ' ')
     .split  (',')
     .map    (term => term.trim())
     .filter (term => term) // Non-empty only
-    .filter (term => /^[a-zA-Z0-9._\-" ]+$/.test(term)) // Of allowed characters only
-    .map    (parse_advanced_term);
+    .map    (parse_term);
+}
+
+function input_allowed_chars(input) {
+  return !/[^a-zA-Z0-9._\-'" ,]/.test(input);
 }
 
 function process_filter() {
-  const process_0 = performance.now();
+  const time_0    = performance.now();
   const container = document.getElementById("results");
-  const err_valid = '<div class="text-center text-comment">Valid dates are: YYYY / YYYY-MM / YYYY-MM-DD</div>';
-  const err_range = '<div class="text-center text-comment">Start date must be before end date</div>';
+  const timings   = document.getElementById("timings");
+        timings.textContent = "";
+
+  const err_dates = '<div class="text-center text-comment">' +
+    'Valid dates are: YYYY / YYYY-MM / YYYY-MM-DD</div>';
+  const err_range = '<div class="text-center text-comment">' +
+    'Start date must be before end date</div>';
+  const err_chars = '<div class="text-center text-comment">' +
+    'Allowed characters are: a-z, 0-9, underscore, dash, period, comma, quote, and space</div>';
 
   // Archived range
   const archived_min_str = document.getElementById("archived-min").value.trim();
@@ -638,7 +655,7 @@ function process_filter() {
   const archived_max_range = get_date_range(archived_max_str);
 
   if (!archived_min_range || !archived_max_range) {
-    container.innerHTML = err_valid;
+    container.innerHTML = err_dates;
     return;
   }
 
@@ -658,7 +675,7 @@ function process_filter() {
   const created_max_range = get_date_range(created_max_str);
 
   if (!created_min_range || !created_max_range) {
-    container.innerHTML = err_valid;
+    container.innerHTML = err_dates;
     return;
   }
 
@@ -671,8 +688,16 @@ function process_filter() {
   }
 
   // Collections and Creators
-  const collections = clean_filter_input(document.getElementById("collections").value);
-  const creators    = clean_filter_input(document.getElementById("creators"   ).value);
+  const collections_str = document.getElementById("collections").value;
+  const creators_str    = document.getElementById("creators"   ).value;
+
+  if (!input_allowed_chars(collections_str) || !input_allowed_chars(creators_str)) {
+    container.innerHTML = err_chars;
+    return;
+  }
+
+  const collections = input_clean_parse(collections_str);
+  const creators    = input_clean_parse(creators_str   );
 
   // Process
   const filtered_curr_items = filter_items(
@@ -680,20 +705,20 @@ function process_filter() {
   const filtered_prev_items = filter_items(
     stat_prev_items, archived_min, archived_max, created_min, created_max, collections, creators);
 
-  const process_1    = performance.now();
+  const time_1       = performance.now();
   const results_curr = calculate_stats(filtered_curr_items, stat_curr_date);
   const results_prev = calculate_stats(filtered_prev_items, stat_prev_date);
-  const process_2    = performance.now();
+  const time_2       = performance.now();
 
   render_results(results_curr, results_prev);
 
   // Timings
-  const process_3 = performance.now();
-  const timings   = document.getElementById("timings");
-
-  timings.textContent = 'Filter ' + (process_1 - process_0).toFixed(1) + ' ms / ' +
-                        'Calc '   + (process_2 - process_1).toFixed(1) + ' ms / ' +
-                        'Render ' + (process_3 - process_2).toFixed(1) + ' ms';
+  const time_3        = performance.now();
+  timings.textContent = 'Load '   + du_load          .toFixed(1) + ' ms / ' +
+                        'Parse '  + du_parse         .toFixed(1) + ' ms / ' +
+                        'Filter ' + (time_1 - time_0).toFixed(1) + ' ms / ' +
+                        'Calc '   + (time_2 - time_1).toFixed(1) + ' ms / ' +
+                        'Render ' + (time_3 - time_2).toFixed(1) + ' ms';
 }
 
 /* Date Change */
@@ -710,7 +735,7 @@ function date_change_menu(event, what) {
   menu.id                    = 'date-change-menu';
   menu.style.position        = 'absolute';
   menu.style.left            = (rect.left + window.scrollX)       + 'px';
-  menu.style.top             = (rect.top  + window.scrollY - 134) + 'px';
+  menu.style.top             = (rect.top  + window.scrollY - 157) + 'px'; // 3:129, 4:157, d:28
   menu.style.zIndex          = '1000';
   menu.style.backgroundColor = '#fafafa'; // Gray98
   menu.style.border          = '2px solid #ebebeb'; // Gray92
@@ -759,6 +784,7 @@ function date_change_menu(event, what) {
 /* Main */
 
 function load_stat_file(date) {
+  const time_0  = performance.now();
   const xml_url = "/archive/archive-org-sergecpp-" + date + ".xml.txt";
 
   return fetch(xml_url)
@@ -767,9 +793,15 @@ function load_stat_file(date) {
       return response.text();
     })
     .then(text => {
+      const time_1 = performance.now();
       const parser = new DOMParser();
-      const xml = parser.parseFromString(text, "text/xml");
-      if   (xml.querySelector("parsererror")) { throw new Error(date + " &mdash; Invalid XML format"); }
+      const xml    = parser.parseFromString(text, "text/xml");
+      const time_2 = performance.now();
+
+      du_load  += (time_1 - time_0);
+      du_parse += (time_2 - time_1);
+
+      if (xml.querySelector("parsererror")) { throw new Error(date + " &mdash; Invalid XML format"); }
       return [...xml.querySelectorAll("doc")];
     });
 }
@@ -782,6 +814,10 @@ function reload_stat(date, what) {
   } else { //  "prev"
     if (stat_prev_date === date) return;
   }
+
+  // Reset
+  du_load  = 0;
+  du_parse = 0;
 
   load_stat_file(date)
     .then(loaded_items => {
