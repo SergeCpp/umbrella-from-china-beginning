@@ -8,62 +8,62 @@ let   stats_prev_items = [];
 
 /* Startup Run */
 
+init_controls();
 process_stats();
 
 /* Items */
 
 function filter_items(items, archived_min, archived_max, created_min, created_max) {
-  const filtered_items = items
-    .filter(doc => {
-      const publicdate_node = doc.querySelector("str[name='publicdate']");
-      const date_node       = doc.querySelector("str[name='date']"      );
-      const downloads_node  = doc.querySelector("str[name='downloads']" );
-      const month_node      = doc.querySelector("str[name='month']"     );
-      const week_node       = doc.querySelector("str[name='week']"      );
-      const mediatype_node  = doc.querySelector("str[name='mediatype']" );
-      const identifier_node = doc.querySelector("str[name='identifier']");
+  const filtered_items = items.filter(doc => {
+    const publicdate_node = doc.querySelector("str[name='publicdate']");
+    const date_node       = doc.querySelector("str[name='date']"      );
+    const downloads_node  = doc.querySelector("str[name='downloads']" );
+    const month_node      = doc.querySelector("str[name='month']"     );
+    const week_node       = doc.querySelector("str[name='week']"      );
+    const mediatype_node  = doc.querySelector("str[name='mediatype']" );
+    const identifier_node = doc.querySelector("str[name='identifier']");
 
-      if (!publicdate_node ||
-          !downloads_node  || !month_node || !week_node ||
-          !mediatype_node  || !identifier_node) {
+    if (!publicdate_node ||
+        !downloads_node  || !month_node || !week_node ||
+        !mediatype_node  || !identifier_node) {
+      return false;
+    }
+
+    // Archived
+    const publicdate = new Date(publicdate_node.textContent);
+    if (isNaN(publicdate.getTime())) return false;
+    const archived_ok = (publicdate >= archived_min) && (publicdate <= archived_max);
+
+    // Created
+    const mediatype = mediatype_node.textContent;
+    let   date      = null;
+
+    if (!date_node) {
+      if (mediatype === "audio") { // Set default date for audio items
+        date = new Date("2012-01-01T00:00:00Z"); // UTC date, earliest for entire stats
+      } else {
         return false;
       }
+    } else {
+      date = new Date(date_node.textContent);
+      if (isNaN(date.getTime())) return false;
+    }
 
-      // Archived
-      const publicdate = new Date(publicdate_node.textContent);
-      if (isNaN(publicdate.getTime())) return false;
-      const archived_ok = (publicdate >= archived_min) && (publicdate <= archived_max);
+    const created_ok = (date >= created_min) && (date <= created_max);
 
-      // Created
-      const mediatype = mediatype_node.textContent;
-      let   date      = null;
+    // Views
+    const downloads = parseInt(downloads_node.textContent, 10);
+    const month     = parseInt(month_node    .textContent, 10);
+    const week      = parseInt(week_node     .textContent, 10);
 
-      if (!date_node) {
-        if (mediatype === "audio") { // Set default date for audio items
-          date = new Date("2012-01-01T00:00:00Z"); // UTC date, earliest for entire stats
-        } else {
-          return false;
-        }
-      } else {
-        date = new Date(date_node.textContent);
-        if (isNaN(date.getTime())) return false;
-      }
+    if (isNaN(downloads) || isNaN(month) || isNaN(week)) return false;
+    if ((downloads < month) || (month < week)) return false;
 
-      const created_ok = (date >= created_min) && (date <= created_max);
+    // Mediatype
+    const is_collection = (mediatype === "collection");
+    const is_texts      = (mediatype === "texts"     );
 
-      // Views
-      const downloads = parseInt(downloads_node.textContent, 10);
-      const month     = parseInt(month_node    .textContent, 10);
-      const week      = parseInt(week_node     .textContent, 10);
-
-      if (isNaN(downloads) || isNaN(month) || isNaN(week)) return false;
-      if ((downloads < month) || (month < week)) return false;
-
-      // Mediatype
-      const is_collection = (mediatype === "collection");
-      const is_texts      = (mediatype === "texts"     );
-
-      return archived_ok && created_ok && !is_collection && !is_texts;
+    return archived_ok && created_ok && !is_collection && !is_texts;
   });
   return filtered_items;
 }
@@ -99,6 +99,31 @@ function calculate_stats(filtered_items, stats_date) {
 }
 
 /* Display */
+
+function get_grow(curr, prev) {
+  const ratio = prev !== 0
+              ? curr / prev
+              : curr === 0
+              ? 1
+              : 123;
+
+  if (ratio === 1) { return "   "; }
+
+  if ((ratio >= 0.99) && (ratio <= 1.01)) { return ".  "; }
+  if ((ratio >= 0.98) && (ratio <= 1.02)) { return ".. "; }
+  if ((ratio >= 0.97) && (ratio <= 1.03)) { return "..."; }
+
+  if   (ratio >  1) {
+    if (ratio <= 1.05) { return "+  "; }
+    if (ratio <= 1.07) { return "++ "; }
+                         return "+++";
+  }
+
+  //  ratio <  1
+  if (ratio >= 0.95) { return "-  "; }
+  if (ratio >= 0.93) { return "-- "; }
+                       return "---";
+}
 
 function render_results(results_curr, results_prev) {
   const container = document.getElementById("results");
@@ -136,9 +161,9 @@ function render_results(results_curr, results_prev) {
   const total = mediatypeCounts.movies + mediatypeCounts.audio;
   const countDiv = document.createElement("div");
   countDiv.className = "text-center subtitle";
-  countDiv.textContent = 'Stats ' + stats_prev_date + ' – ' + stats_curr_date + ' / ' +
-                         'Total ' + total + ' ' +
-                        '(Audio ' + mediatypeCounts.audio  + ' / Video ' + mediatypeCounts.movies + ')';
+  countDiv.innerHTML = 'Stats ' + stats_prev_date + ' &ndash; ' + stats_curr_date + ' / ' +
+                       'Total ' + total + ' ' +
+                      '(Audio ' + mediatypeCounts.audio  + ' / Video ' + mediatypeCounts.movies + ')';
   container.appendChild(countDiv);
 
   // Show stats: min, 10%, 25%, 50%, 75%, 90%, max
@@ -184,119 +209,232 @@ function render_results(results_curr, results_prev) {
 
     // 3. Title
     const title = document.createElement("div");
-    title.className   = "item-title";
-    title.textContent = (index + 1) + ". " + item.title;
+    title.className = "item-title";
+
+    const link = document.createElement("a");
+    link.textContent = (index + 1) + ". " + item.title;
+    link.href = "https://archive.org/details/" + item.identifier;
+    link.target = "_blank";
+    link.rel = "noopener"; // Safe for _blank
+    title.appendChild(link);
 
     // 4.0. Get matching prev item
     const item_prev = map_prev[item.identifier];
 
-    // 4.1. Prev stats container (stacked)
-    const stats_prev_container = document.createElement("div");
-    stats_prev_container.className = "item-stats-container";
+    // 4.1. Prev stat container (stacked)
+    const stat_prev_container = document.createElement("div");
+    stat_prev_container.className = "item-stat-container";
 
     // 4.2. Prev: old stat line
     const stat_prev_old = document.createElement("div");
-    stat_prev_old.className   ="item-stat-main";
-    stat_prev_old.textContent = item_prev.views_old.toString() + " /" +
+    stat_prev_old.className   ="item-stat-old";
+    stat_prev_old.textContent = item_prev.views_old.toString().padStart(6) + " /" +
                                 item_prev.days_old .toString().padStart(5) + " =" +
                                 item_prev.ratio_old.toFixed(3).padStart(7);
 
     // 4.3. Prev: 23-day stat line
     const stat_prev_23 = document.createElement("div");
     stat_prev_23.className   ="item-stat-23";
-    stat_prev_23.textContent = item_prev.views_23.toString() + " /   23 =" +
+    stat_prev_23.textContent = item_prev.views_23.toString().padStart(6) + " /   23 =" +
                                item_prev.ratio_23.toFixed(3).padStart(7);
 
     // 4.4. Prev: 7-day stat line
     const stat_prev_7 = document.createElement("div");
     stat_prev_7.className   ="item-stat-7";
-    stat_prev_7.textContent = item_prev.views_7.toString() + " /    7 =" +
+    stat_prev_7.textContent = item_prev.views_7.toString().padStart(6) + " /    7 =" +
                               item_prev.ratio_7.toFixed(3).padStart(7);
 
     // 4.5. Prev: assemble the hierarchy
-    stats_prev_container.appendChild(stat_prev_old);
-    stats_prev_container.appendChild(stat_prev_23 );
-    stats_prev_container.appendChild(stat_prev_7  );
+    stat_prev_container.appendChild(stat_prev_old);
+    stat_prev_container.appendChild(stat_prev_23 );
+    stat_prev_container.appendChild(stat_prev_7  );
 
     // 5. Spacer between prev and curr
     const spacer = document.createElement("div");
     spacer.className = "item-spacer";
-  //spacer.textContent = " "; // Optional: keeps layout consistent
 
-    // 6.1. Curr stats container (stacked)
-    const stats_curr_container = document.createElement("div");
-    stats_curr_container.className = "item-stats-container";
+    // 6.1. Curr stat container (stacked)
+    const stat_curr_container = document.createElement("div");
+    stat_curr_container.className = "item-stat-container";
 
     // 6.2. Curr: old stat line
     const stat_curr_old = document.createElement("div");
-    stat_curr_old.className   ="item-stat-main";
-    stat_curr_old.textContent = item.views_old.toString() + " /" +
+    stat_curr_old.className   ="item-stat-old";
+    stat_curr_old.textContent = item.views_old.toString().padStart(6) + " /" +
                                 item.days_old .toString().padStart(5) + " =" +
                                 item.ratio_old.toFixed(3).padStart(7);
 
     // 6.3. Curr: 23-day stat line
     const stat_curr_23 = document.createElement("div");
     stat_curr_23.className   ="item-stat-23";
-    stat_curr_23.textContent = item.views_23.toString() + " /   23 =" +
+    stat_curr_23.textContent = item.views_23.toString().padStart(6) + " /   23 =" +
                                item.ratio_23.toFixed(3).padStart(7);
 
     // 6.4. Curr: 7-day stat line
     const stat_curr_7 = document.createElement("div");
     stat_curr_7.className   ="item-stat-7";
-    stat_curr_7.textContent = item.views_7.toString() + " /    7 =" +
+    stat_curr_7.textContent = item.views_7.toString().padStart(6) + " /    7 =" +
                               item.ratio_7.toFixed(3).padStart(7);
 
     // 6.5. Curr: assemble the hierarchy
-    stats_curr_container.appendChild(stat_curr_old);
-    stats_curr_container.appendChild(stat_curr_23 );
-    stats_curr_container.appendChild(stat_curr_7  );
+    stat_curr_container.appendChild(stat_curr_old);
+    stat_curr_container.appendChild(stat_curr_23 );
+    stat_curr_container.appendChild(stat_curr_7  );
 
-    // 7. Add all parts
+    // 7.1. Grow container (stacked)
+    const stat_grow_container = document.createElement("div");
+    stat_grow_container.className = "item-grow-container";
+
+    // 7.2. Grow: old
+    const stat_grow_old = document.createElement("div");
+    stat_grow_old.className ="item-grow-old";
+
+    const grow_old = get_grow(item.ratio_old, item_prev.ratio_old);
+    stat_grow_old.textContent = grow_old;
+
+    // 7.3. Grow: 23
+    const stat_grow_23 = document.createElement("div");
+    stat_grow_23.className ="item-grow-23";
+
+    const grow_23 = get_grow(item.ratio_23, item_prev.ratio_23);
+    stat_grow_23.textContent = grow_23;
+
+    // 7.4. Grow: 7
+    const stat_grow_7 = document.createElement("div");
+    stat_grow_7.className ="item-grow-7";
+
+    const grow_7 = get_grow(item.ratio_7, item_prev.ratio_7);
+    stat_grow_7.textContent = grow_7;
+
+    // 7.5. Grow: assemble the hierarchy
+    stat_grow_container.appendChild(stat_grow_old);
+    stat_grow_container.appendChild(stat_grow_23 );
+    stat_grow_container.appendChild(stat_grow_7  );
+
+    // 8. Add all parts
     inner.appendChild(title);
-    inner.appendChild(stats_prev_container); // Add prev stats container to inner flex
+    inner.appendChild(stat_prev_container);
     inner.appendChild(spacer);
-    inner.appendChild(stats_curr_container); // Add curr stats container to inner flex
+    inner.appendChild(stat_curr_container);
+    inner.appendChild(stat_grow_container);
 
-    // 8. And wrap
+    // 9. And wrap
     wrapper  .appendChild(inner  ); // Add inner flex to wrapper
     container.appendChild(wrapper); // Add wrapper to the page
   });
 }
 
-/* Button */
+/* Controls */
+
+function init_controls() {
+  // 1. Add Enter key to all date inputs
+  ["archived-min", "archived-max", "created-min", "created-max"].forEach(id => {
+    const input = document.getElementById(id);
+    if   (input) {
+      input.onkeyup = function(event) {
+        if (event.key === "Enter") {
+          process_filtered_range();
+        }
+      };
+    }
+  });
+
+  // 2. Add click to button
+  const button = document.getElementById("process-button");
+  if   (button) {
+    button.onclick = process_filtered_range;
+  }
+}
+
+function is_date_valid(year, month, day) {
+  // Create date and check if it "corrects" the input
+  const  date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && 
+         date.getUTCMonth() === (month - 1) && 
+         date.getUTCDate() === day;
+}
+
+function get_date_range(date_str) {
+  if (!date_str) return null;
+
+  // Catch empty parts like "2022-", "2022--", "2022-08-", "2022--08"
+  const parts_str = date_str.trim().split('-');
+  if   (parts_str.some(part => (part === ""))) return null;
+
+  // Now convert to numbers
+  const parts = parts_str.map(Number);
+  if   (parts.some(isNaN)) return null;
+
+  // And process them
+  if (parts.length === 1) { // Year
+    const year = parts[0];
+    return {
+      min: new Date(Date.UTC(year, 01-1, 01, 00, 00, 00)), // Year beg day
+      max: new Date(Date.UTC(year, 12-1, 31, 23, 59, 59))  // Year end day
+    }
+  }
+  if (parts.length === 2) { // Year-Month
+    const [year, month] = parts;
+    if (!is_date_valid(year, month, 1)) return null;
+    const e_mday = new Date(year, month,  0).getDate();
+    return {
+      min: new Date(Date.UTC(year, month - 1, 1,      00, 00, 00)), // Month beg day
+      max: new Date(Date.UTC(year, month - 1, e_mday, 23, 59, 59))  // Month end day
+    }
+  }
+  if (parts.length === 3) { // Year-Month-Day
+    const [year, month, day] = parts;
+    if (!is_date_valid(year, month, day)) return null;
+    return {
+      min: new Date(Date.UTC(year, month - 1, day, 00, 00, 00)), // Day beg
+      max: new Date(Date.UTC(year, month - 1, day, 23, 59, 59))  // Day end
+    }
+  }
+  return null; // Invalid format
+}
 
 function process_filtered_range() {
   const container = document.getElementById("results");
+  const err_valid = '<div class="text-center text-comment">Valid dates are: YYYY / YYYY-MM / YYYY-MM-DD</div>';
+  const err_range = '<div class="text-center text-comment">Start date must be before end date</div>';
 
   // Archived range
-  const archived_min_str = document.getElementById("archived-min").value;
-  const archived_max_str = document.getElementById("archived-max").value;
+  const archived_min_str = document.getElementById("archived-min").value.trim();
+  const archived_max_str = document.getElementById("archived-max").value.trim();
 
-  const archived_min = new Date(archived_min_str + 'T00:00:00Z');
-  const archived_max = new Date(archived_max_str + 'T23:59:59Z');
+  const archived_min_range = get_date_range(archived_min_str);
+  const archived_max_range = get_date_range(archived_max_str);
 
-  if (isNaN(archived_min.getTime()) || isNaN(archived_max.getTime())) {
-    container.innerHTML = '<div class="text-center text-comment">Please enter valid dates: YYYY-MM-DD</div>';
+  if (!archived_min_range || !archived_max_range) {
+    container.innerHTML = err_valid;
     return;
   }
+
+  const archived_min = archived_min_range.min;
+  const archived_max = archived_max_range.max;
+
   if (archived_min > archived_max) {
-    container.innerHTML = '<div class="text-center text-comment">Start date must be before end date</div>';
+    container.innerHTML = err_range;
     return;
   }
 
   // Created range
-  const created_min_str = document.getElementById("created-min").value;
-  const created_max_str = document.getElementById("created-max").value;
+  const created_min_str = document.getElementById("created-min").value.trim();
+  const created_max_str = document.getElementById("created-max").value.trim();
 
-  const created_min = new Date(created_min_str + 'T00:00:00Z');
-  const created_max = new Date(created_max_str + 'T23:59:59Z');
+  const created_min_range = get_date_range(created_min_str);
+  const created_max_range = get_date_range(created_max_str);
 
-  if (isNaN(created_min.getTime()) || isNaN(created_max.getTime())) {
-    container.innerHTML = '<div class="text-center text-comment">Please enter valid dates: YYYY-MM-DD</div>';
+  if (!created_min_range || !created_max_range) {
+    container.innerHTML = err_valid;
     return;
   }
+
+  const created_min = created_min_range.min;
+  const created_max = created_max_range.max;
+
   if (created_min > created_max) {
-    container.innerHTML = '<div class="text-center text-comment">Start date must be before end date</div>';
+    container.innerHTML = err_range;
     return;
   }
 

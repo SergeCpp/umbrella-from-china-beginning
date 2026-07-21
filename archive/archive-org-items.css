@@ -1,10 +1,10 @@
 .item {
-  align-items: center; /* Vertically center title and stats */
+  align-items: center; /* Vertically center title, stats, spacer, and grow */
   display: flex;
   justify-content: space-between;
 }
 .item-title {
-  flex: 1 1 67%;
+  flex: 1 1 60%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -17,15 +17,16 @@
 }
 .item-spacer {
   flex: 0 0 1em;
+  height: 1em;
 /*background-color: #ef6f6f; */ /* For testing */
 }
 .item-stat-container {
-  align-items: flex-end; /* Right-align all stats */
+  align-items: flex-end; /* Right-align all stat */
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
   font-family: monospace;
-  white-space: pre; /* Preserve spacing */
+  white-space: pre;
 /*background-color: #00cf00; */ /* For testing */
 }
 .item-stat-old {
@@ -36,11 +37,12 @@
   color: #696969; /* DimGray, L41 */
 }
 .item-grow-container {
-  align-items: center;
+  align-items: flex-start; /* Left-align all grow */
   display: flex;
-  flex: 0 0 1em;
+  flex: 0 0 auto;
   flex-direction: column;
   font-family: monospace;
+  white-space: pre;
   margin-left: 0.3em;
 /*background-color: #ef6f6f; */ /* For testing */
 }

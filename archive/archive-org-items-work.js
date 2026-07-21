@@ -101,19 +101,28 @@ function calculate_stats(filtered_items, stats_date) {
 /* Display */
 
 function get_grow(curr, prev) {
-  const ratio = curr / prev;
+  const ratio = prev !== 0
+              ? curr / prev
+              : curr === 0
+              ? 1
+              : 123;
 
-  if (ratio === 1) {
-    return { char: "&centerdot;", color: "#ffffff" }; // White, L100
-  }
-  if ((ratio >= 0.99) && (ratio <= 1.01)) {
-    return { char: "&#x2022;", color: "#696969" }; // DimGray, L41
-  }
-  if (ratio > 1) {
-    return { char: "&#x25b2;", color: "#9e9e9e" }; // Up, Gray62
+  if (ratio === 1) { return "   "; }
+
+  if ((ratio >= 0.99) && (ratio <= 1.01)) { return ".  "; }
+  if ((ratio >= 0.98) && (ratio <= 1.02)) { return ".. "; }
+  if ((ratio >= 0.97) && (ratio <= 1.03)) { return "..."; }
+
+  if   (ratio >  1) {
+    if (ratio <= 1.05) { return "+  "; }
+    if (ratio <= 1.07) { return "++ "; }
+                         return "+++";
   }
 
-  return { char: "&#x25bc;", color: "#9e9e9e" }; // Dn, Gray62
+  //  ratio <  1
+  if (ratio >= 0.95) { return "-  "; }
+  if (ratio >= 0.93) { return "-- "; }
+                       return "---";
 }
 
 function render_results(results_curr, results_prev) {
@@ -281,24 +290,21 @@ function render_results(results_curr, results_prev) {
     stat_grow_old.className ="item-grow-old";
 
     const grow_old = get_grow(item.ratio_old, item_prev.ratio_old);
-    stat_grow_old.innerHTML   = grow_old.char;
-    stat_grow_old.style.color = grow_old.color;
+    stat_grow_old.textContent = grow_old;
 
     // 7.3. Grow: 23
     const stat_grow_23 = document.createElement("div");
     stat_grow_23.className ="item-grow-23";
 
     const grow_23 = get_grow(item.ratio_23, item_prev.ratio_23);
-    stat_grow_23.innerHTML   = grow_23.char;
-    stat_grow_23.style.color = grow_23.color;
+    stat_grow_23.textContent = grow_23;
 
     // 7.4. Grow: 7
     const stat_grow_7 = document.createElement("div");
     stat_grow_7.className ="item-grow-7";
 
     const grow_7 = get_grow(item.ratio_7, item_prev.ratio_7);
-    stat_grow_7.innerHTML   = grow_7.char;
-    stat_grow_7.style.color = grow_7.color;
+    stat_grow_7.textContent = grow_7;
 
     // 7.5. Grow: assemble the hierarchy
     stat_grow_container.appendChild(stat_grow_old);
