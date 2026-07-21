@@ -30,7 +30,7 @@
 
 <div class ="text-center"><a
      target="_blank"
-     rel   ="nofollow"
+     rel   ="nofollow noopener"
      href  ="https://archive.org/advancedsearch.php
 ?q=uploader:sergecpp+AND+NOT+uploader:for_sergecpp
 &amp;fl[]=identifier&amp;fl[]=title&amp;fl[]=mediatype
@@ -42,13 +42,31 @@
 
 <div class      ="text-center"
      style      ="font-family:monospace; margin: 0.5em 0;"><input
+     id         ="collections"
+     style      ="font-family:monospace;"
+     type       ="text"
+     size       ="84"
+     maxlength  ="84"
+     placeholder="Collections: chinese-beauty, chinese-clothing, chinese-dance, xiaodan, ziyansweet"></div>
+
+<div class      ="text-center"
+     style      ="font-family:monospace; margin: 0.5em 0;"><input
+     id         ="creators"
+     style      ="font-family:monospace;"
+     type       ="text"
+     size       ="84"
+     maxlength  ="84"
+     placeholder="Creators: Ziyan, Xiaodan, Qisan, Xiao Wu, Zi Jiaer / AND OR NOT / a-z, 0-9, _, -"></div>
+
+<div class      ="text-center"
+     style      ="font-family:monospace; margin: 0.5em 0;"><input
      id         ="created-min"
      style      ="font-family:monospace;"
      type       ="text"
      size       ="10"
      minlength  = "4"
      maxlength  ="10"
-     value      ="2012-01-01">&nbsp;&lt;created&gt;&nbsp;<input
+     value      ="2012-01-01">&nbsp;created&nbsp;<input
      id         ="created-max"
      style      ="font-family:monospace;"
      type       ="text"
@@ -57,14 +75,14 @@
      maxlength  ="10"
      value      ="2024-10-19">&nbsp;<button
      id         ="process-button"
-     style      ="font-family:monospace;">Process</button>&nbsp;<input
+     style      ="font-family:monospace;">Filter</button>&nbsp;<input
      id         ="archived-min"
      style      ="font-family:monospace;"
      type       ="text"
      size       ="10"
      minlength  = "4"
      maxlength  ="10"
-     value      ="2022-05-06">&nbsp;&lt;archived&gt;&nbsp;<input
+     value      ="2022-05-06">&nbsp;archived&nbsp;<input
      id         ="archived-max"
      style      ="font-family:monospace;"
      type       ="text"
@@ -72,24 +90,6 @@
      minlength  = "4"
      maxlength  ="10"
      value      ="2025-03-08"></div>
-
-<div class      ="text-center"
-     style      ="font-family:monospace; margin: 0.5em 0;"><input
-     id         ="collections"
-     style      ="font-family:monospace;"
-     type       ="text"
-     size       ="80"
-     maxlength  ="80"
-     placeholder="Collections: chinese-beauty, chinese-clothing, chinese-dance / AND NOT"></div>
-
-<div class      ="text-center"
-     style      ="font-family:monospace; margin: 0.5em 0;"><input
-     id         ="creators"
-     style      ="font-family:monospace;"
-     type       ="text"
-     size       ="80"
-     maxlength  ="80"
-     placeholder="Creators: Ziyan, Xiaodan, Qisan / AND NOT"></div>
 
 <!--
 favorites count

@@ -13,28 +13,30 @@ process_stats();
 
 /* Items */
 
-function evaluate_term(termObj, values, match_fn) {
-  switch(termObj.type) {
+function evaluate_term(term_obj, values, match_fn) {
+  switch(term_obj.type) {
     case "AND":
-      return termObj.terms.every(subTerm => 
-        evaluate_term(subTerm, values, match_fn)
+      return term_obj.terms.every(sub_term => 
+        evaluate_term(sub_term, values, match_fn)
+      );
+
+    case "OR":
+      return term_obj.terms.some(sub_term => 
+        evaluate_term(sub_term, values, match_fn)
       );
 
     case "NOT":
-      const mainMatches = termObj.main
-                        ? evaluate_term(termObj.main, values, match_fn)
-                        : true; // Nothing from left
-      const exclusionMatches = evaluate_term(termObj.exclusion, values, match_fn);
-//      const exclusionMatches = values.some(value =>
-//        match_fn(value, termObj.exclusion)
-//      );
-      return mainMatches && !exclusionMatches;
+      const matches_main      = term_obj.main
+                              ? evaluate_term(term_obj.main,      values, match_fn)
+                              : true; // Nothing from left
+      const matches_exclusion = evaluate_term(term_obj.exclusion, values, match_fn);
+      return matches_main && !matches_exclusion;
 
     case "PLAIN":
-      return values.some(value => match_fn(value, termObj.term));
+      return values.some(value => match_fn(value, term_obj.term));
 
     default:
-      return false;
+      return false; // Unknown type
   }
 }
 
@@ -58,39 +60,6 @@ function filter_matches(doc, field, terms, match_fn) {
   return terms.some(term_obj => {
     return evaluate_term(term_obj, values, match_fn);
   });
-
-  /*
-  // Check if any term matches based on its type
-  return terms.some(term_obj => {
-    switch(term_obj.type) {
-      case "AND":
-        // ALL terms must match
-        return term_obj.terms.every(sub_term => 
-          values.some(value => match_fn(value, sub_term))
-        );
-
-      case "NOT":
-        // Main term must match, exclusion must NOT match
-        const main_matches      = values.some(value => match_fn(value, term_obj.main));
-        const exclusion_matches = values.some(value => match_fn(value, term_obj.exclusion));
-        return main_matches && !exclusion_matches;
-
-      case "PLAIN":
-        // Current OR behavior (comma-separated terms)
-        return values.some(value => match_fn(value, term_obj.term));
-
-      default:
-        return false;
-    }
-  });
-  */
-
-  /*
-  // Check if any term matches any value
-  return terms.some(term => 
-    values.some(value => match_fn(value, term))
-  );
-  */
 }
 
 function filter_items(items, archived_min, archived_max, created_min, created_max, collections, creators) {
@@ -554,8 +523,16 @@ function get_date_range(date_str) {
 }
 
 function parse_advanced_term(term) {
-  // Check for NOT first (higher precedence)
-  if(term.substring(0, 4) === "NOT ") { // Leading NOT
+  // Check for AND first (higher precedence)
+  if (term.includes(" AND ")) {
+    const terms = term.split(" AND ").map(t => parse_advanced_term(t.trim()));
+    return {
+      type: "AND",
+      terms: terms
+    };
+  }
+  // Check for NOT next
+  else if(term.substring(0, 4) === "NOT ") { // Leading NOT
     return {
       type     : "NOT",
       main     : null, // Nothing from left
@@ -567,18 +544,17 @@ function parse_advanced_term(term) {
       type     : "NOT",
       main     : parse_advanced_term(main     .trim()),
       exclusion: parse_advanced_term(exclusion.trim())
-//    exclusion: exclusion.trim()
     };
   }
-  // Check for AND next
-  else if (term.includes(" AND ")) {
-    const terms = term.split(" AND ").map(t => parse_advanced_term(t.trim()));
+  // Check for OR next
+  else if (term.includes(" OR ")) {
+    const terms = term.split(" OR ").map(t => parse_advanced_term(t.trim()));
     return {
-      type: "AND",
+      type: "OR",
       terms: terms
     };
   }
-  // Plain term (OR behavior)
+  // Plain term (OR behavior of comma-separated terms)
   else {
     return {
       type: "PLAIN",
