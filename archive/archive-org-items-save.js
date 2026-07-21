@@ -617,6 +617,7 @@ function clean_filter_input(input) {
 }
 
 function process_filtered_range() {
+  const process_0 = performance.now();
   const container = document.getElementById("results");
   const err_valid = '<div class="text-center text-comment">Valid dates are: YYYY / YYYY-MM / YYYY-MM-DD</div>';
   const err_range = '<div class="text-center text-comment">Start date must be before end date</div>';
@@ -671,10 +672,20 @@ function process_filtered_range() {
   const filtered_prev_items = filter_items(
     stat_prev_items, archived_min, archived_max, created_min, created_max, collections, creators);
 
+  const process_1    = performance.now();
   const results_curr = calculate_stats(filtered_curr_items, stat_curr_date);
   const results_prev = calculate_stats(filtered_prev_items, stat_prev_date);
+  const process_2    = performance.now();
 
   render_results(results_curr, results_prev);
+
+  // Timings
+  const process_3 = performance.now();
+  const timings   = document.getElementById("timings");
+
+  timings.textContent = 'Filter ' + (process_1 - process_0).toFixed(1) + ' ms / ' +
+                        'Calc '   + (process_2 - process_1).toFixed(1) + ' ms / ' +
+                        'Render ' + (process_3 - process_2).toFixed(1) + ' ms';
 }
 
 /* Main */
@@ -711,8 +722,7 @@ function process_stats() {
     process_filtered_range();
   })
   .catch(err => {
-    document.getElementById("results").innerHTML =
-      '<div class="text-center text-comment">Error: ' + err.message + '</div>';
+    container.innerHTML = '<div class="text-center text-comment">Error: ' + err.message + '</div>';
   });
 }
 
