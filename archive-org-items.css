@@ -1,0 +1,78 @@
+.item {
+  align-items: center; /* Vertically center title, stats, spacer, and grow */
+  display: flex;
+  justify-content: space-between;
+}
+.item-title {
+  flex: 1 1 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+/*background-color: #7f7fff; */ /* For testing */
+}
+.item-title a {
+  color: inherit; /* Use parent text color */
+  display: block; /* Ensures full title area is clickable */
+  text-decoration: none;
+}
+.item-spacer {
+  flex: 0 0 1em;
+  height: 1em;
+/*background-color: #ef6f6f; */ /* For testing */
+}
+.item-stat-container {
+  align-items: flex-end; /* Right-align all stat */
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  font-family: monospace;
+  white-space: pre;
+/*background-color: #00cf00; */ /* For testing */
+}
+.item-stat-old {
+  color: black;
+  font-weight: normal; /* bold; */
+}
+.item-stat-23,
+.item-stat-7 {
+  color: #696969; /* DimGray, L41 */
+}
+.item-grow-container {
+  align-items: flex-start; /* Left-align all grow */
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  font-family: monospace;
+  white-space: pre;
+  margin-left: 0.3em;
+/*background-color: #ef6f6f; */ /* For testing */
+}
+.item-grow-old {
+  color: black;
+  font-weight: normal; /* bold; */
+}
+.item-grow-23,
+.item-grow-7 {
+  color: #696969; /* DimGray, L41 */
+}
+.item-wrapper {
+  border-top-color: white;
+  border-top-style: solid;
+  border-top-width: medium;
+  border-bottom-color: #ebebeb; /* Gray92 */
+  border-bottom-style: solid;
+  border-bottom-width: medium;
+/*background-color: #7f7fff; */ /* For testing */
+}
+.item-wrapper:last-child {
+  border-bottom: none;
+  margin-bottom: 1rem;
+}
+
+/* EOF */
+
+
+
+
+
+
