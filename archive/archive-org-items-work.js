@@ -247,6 +247,18 @@ function get_grow_fixed(curr, prev) {
                           return "---";
 }
 
+function get_total_counts(results) {
+  const total_counts = { movies: 0, audio: 0, favorited: 0, favorites: 0 };
+  results.forEach(item => {
+    if (item.mediatype === "movies") total_counts.movies++;
+    if (item.mediatype === "audio" ) total_counts.audio++;
+
+    total_counts.favorited += item.favorites != 0;
+    total_counts.favorites += item.favorites;
+  });
+  return total_counts;
+}
+
 function sort_results(results) {
   results.sort((a, b) => { // Descending for views
     if (a.ratio_old !== b.ratio_old) { return b.ratio_old - a.ratio_old; }
@@ -263,8 +275,6 @@ function render_stats(results, date, container) {
   const stats_text = document.createElement("div");
   stats_text.className = "text-center";
   stats_text.style.color = "#696969"; // DimGray, L41
-//stats_text.style.fontFamily = "monospace";
-//stats_text.style.fontSize = "0.8em";
 
   // Calculate stats from sorted results
   const max = results[0                 ]?.ratio_old || 0;
@@ -326,20 +336,17 @@ function render_results(results_curr, results_prev) {
     map_prev[item.identifier] = item;
   });
 
-  // Mediatype counts displaying (for expanded results)
-  const mediatype_counts = { movies: 0, audio: 0 };
-  results_curr_exp.forEach(item => {
-    if (item.mediatype === "movies") mediatype_counts.movies++;
-    if (item.mediatype === "audio" ) mediatype_counts.audio++;
-  });
-
-  const total = mediatype_counts.movies + mediatype_counts.audio;
-  const count_div = document.createElement("div");
-  count_div.className = "subtitle text-center text-normal";
-  count_div.textContent = 'Total ' + total + ' ' +
-                         '(Audio ' + mediatype_counts.audio  + ' / ' +
-                          'Video ' + mediatype_counts.movies + ')';
-  container.appendChild(count_div);
+  // Total counts displaying (for expanded results)
+  const curr_exp_counts  = get_total_counts(results_curr_exp);
+  const curr_exp_total   = curr_exp_counts.movies + curr_exp_counts.audio;
+  const counts_div       = document.createElement("div");
+  counts_div.className   = "subtitle text-center text-normal";
+  counts_div.textContent = 'Total ' + curr_exp_total            +   ' ' +
+                          '(Audio ' + curr_exp_counts.audio     + ' / ' +
+                           'Video ' + curr_exp_counts.movies    +  ') ' +
+                           'Fav '   + curr_exp_counts.favorited + ' / ' +
+                                      curr_exp_counts.favorites;
+  container.appendChild(counts_div);
 
   // Both stats displaying
   render_stats(results_prev, stat_prev_date, container); // Also sorts results_prev
@@ -418,21 +425,27 @@ function render_results(results_curr, results_prev) {
     // 6.2. Curr: old stat line
     const stat_curr_old = document.createElement("div");
     stat_curr_old.className   ="item-stat-old";
-    stat_curr_old.textContent = item.views_old.toString().padStart(6) + " /" +
-                                item.days_old .toString().padStart(5) + " =" +
-                                item.ratio_old.toFixed(3).padStart(7);
+    stat_curr_old.textContent = item.is_exp
+                              ?                        "".padStart(22)
+                              : item.views_old.toString().padStart( 6) + " /" +
+                                item.days_old .toString().padStart( 5) + " =" +
+                                item.ratio_old.toFixed(3).padStart( 7);
 
     // 6.3. Curr: 23-day stat line
     const stat_curr_23 = document.createElement("div");
     stat_curr_23.className   ="item-stat-23";
-    stat_curr_23.textContent = item.views_23.toString().padStart(6) + " /   23 =" +
-                               item.ratio_23.toFixed(3).padStart(7);
+    stat_curr_23.textContent = item.is_exp
+                             ?                       "".padStart(22)
+                             : item.views_23.toString().padStart( 6) + " /   23 =" +
+                               item.ratio_23.toFixed(3).padStart( 7);
 
     // 6.4. Curr: 7-day stat line
     const stat_curr_7 = document.createElement("div");
     stat_curr_7.className   ="item-stat-7";
-    stat_curr_7.textContent = item.views_7.toString().padStart(6) + " /    7 =" +
-                              item.ratio_7.toFixed(3).padStart(7);
+    stat_curr_7.textContent = item.is_exp
+                            ?                      "".padStart(22)
+                            : item.views_7.toString().padStart( 6) + " /    7 =" +
+                              item.ratio_7.toFixed(3).padStart( 7);
 
     // 6.5. Curr: assemble the hierarchy
     stat_curr_container.appendChild(stat_curr_old);
@@ -695,23 +708,7 @@ function process_stats() {
     stat_curr_items = [...xml_curr.querySelectorAll("doc")];
     stat_prev_items = [...xml_prev.querySelectorAll("doc")];
 
-    // Initial filters
-    const archived_min = new Date(Date.UTC(2022, 05-1, 06, 00, 00, 00)); // 2022-05-06 (UTC, months are 0-based)
-    const archived_max = new Date(Date.UTC(2025, 03-1, 08, 23, 59, 59)); // 2025-03-08 (UTC, months are 0-based)
-
-    const created_min  = new Date(Date.UTC(2012, 01-1, 01, 00, 00, 00)); // 2012-01-01 (UTC, months are 0-based)
-    const created_max  = new Date(Date.UTC(2024, 10-1, 19, 23, 59, 59)); // 2024-10-19 (UTC, months are 0-based)
-
-    // Process
-    const filtered_curr_items = filter_items(
-      stat_curr_items, archived_min, archived_max, created_min, created_max, null, null);
-    const filtered_prev_items = filter_items(
-      stat_prev_items, archived_min, archived_max, created_min, created_max, null, null);
-
-    const results_curr        = calculate_stats(filtered_curr_items, stat_curr_date);
-    const results_prev        = calculate_stats(filtered_prev_items, stat_prev_date);
-
-    render_results(results_curr, results_prev);
+    process_filtered_range();
   })
   .catch(err => {
     document.getElementById("results").innerHTML =
