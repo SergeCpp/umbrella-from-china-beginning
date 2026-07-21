@@ -306,10 +306,9 @@ function render_results(results_curr, results_prev) {
 
   // Lookup helper
   const results_curr_ids = {};
-
   results_curr.forEach(item => {
     results_curr_ids[item.identifier] = true;
-  })
+  });
 
   // Create expanded results array
   const results_curr_exp = results_curr.map(item => ({ ...item, is_exp: false }));
@@ -381,21 +380,27 @@ function render_results(results_curr, results_prev) {
     // 4.2. Prev: old stat line
     const stat_prev_old = document.createElement("div");
     stat_prev_old.className   ="item-stat-old";
-    stat_prev_old.textContent = item_prev.views_old.toString().padStart(6) + " /" +
-                                item_prev.days_old .toString().padStart(5) + " =" +
-                                item_prev.ratio_old.toFixed(3).padStart(7);
+    stat_prev_old.textContent = item_prev
+                              ? item_prev.views_old.toString().padStart( 6) + " /" +
+                                item_prev.days_old .toString().padStart( 5) + " =" +
+                                item_prev.ratio_old.toFixed(3).padStart( 7)
+                              :                             "".padStart(22);
 
     // 4.3. Prev: 23-day stat line
     const stat_prev_23 = document.createElement("div");
     stat_prev_23.className   ="item-stat-23";
-    stat_prev_23.textContent = item_prev.views_23.toString().padStart(6) + " /   23 =" +
-                               item_prev.ratio_23.toFixed(3).padStart(7);
+    stat_prev_23.textContent = item_prev
+                             ? item_prev.views_23.toString().padStart( 6) + " /   23 =" +
+                               item_prev.ratio_23.toFixed(3).padStart( 7)
+                             :                            "".padStart(22);
 
     // 4.4. Prev: 7-day stat line
     const stat_prev_7 = document.createElement("div");
     stat_prev_7.className   ="item-stat-7";
-    stat_prev_7.textContent = item_prev.views_7.toString().padStart(6) + " /    7 =" +
-                              item_prev.ratio_7.toFixed(3).padStart(7);
+    stat_prev_7.textContent = item_prev
+                            ? item_prev.views_7.toString().padStart( 6) + " /    7 =" +
+                              item_prev.ratio_7.toFixed(3).padStart( 7)
+                            :                           "".padStart(22);
 
     // 4.5. Prev: assemble the hierarchy
     stat_prev_container.appendChild(stat_prev_old);
@@ -442,21 +447,21 @@ function render_results(results_curr, results_prev) {
     const stat_grow_old = document.createElement("div");
     stat_grow_old.className ="item-grow-old";
 
-    const grow_old = get_grow_ratio(item.ratio_old, item_prev.ratio_old);
+    const grow_old = item_prev ? get_grow_ratio(item.ratio_old, item_prev.ratio_old) : "   ";
     stat_grow_old.textContent = grow_old;
 
     // 7.3. Grow: 23
     const stat_grow_23 = document.createElement("div");
     stat_grow_23.className ="item-grow-23";
 
-    const grow_23 = get_grow_fixed(item.views_23, item_prev.views_23);
+    const grow_23 = item_prev ? get_grow_fixed(item.views_23, item_prev.views_23) : "   ";
     stat_grow_23.textContent = grow_23;
 
     // 7.4. Grow: 7
     const stat_grow_7 = document.createElement("div");
     stat_grow_7.className ="item-grow-7";
 
-    const grow_7 = get_grow_fixed(item.views_7, item_prev.views_7);
+    const grow_7 = item_prev ? get_grow_fixed(item.views_7, item_prev.views_7) : "   ";
     stat_grow_7.textContent = grow_7;
 
     // 7.5. Grow: assemble the hierarchy
@@ -494,7 +499,7 @@ function init_controls() {
   });
 
   // 2. Add click to button
-  const button = document.getElementById("process-button");
+  const button = document.getElementById("process-filter");
   if   (button) {
     button.onclick = process_filtered_range;
   }

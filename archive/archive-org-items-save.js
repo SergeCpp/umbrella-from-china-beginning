@@ -1,9 +1,9 @@
 /* Global Variables */
 
-const stat_curr_date  = "2025-07-23";
+const stat_curr_date  = "2025-07-27";
 let   stat_curr_items = [];
 
-const stat_prev_date  = "2025-07-21";
+const stat_prev_date  = "2025-07-23";
 let   stat_prev_items = [];
 
 /* Startup Run */
@@ -49,7 +49,7 @@ function filter_matches(doc, field, terms, match_fn) {
   let values = [];
 
   if (node) {
-    if (node.tagName === "ARR") {
+    if (node.tagName.toLowerCase() === "arr") {
       values = Array.from(node.querySelectorAll("str")).map(n => n.textContent);
     } else {
       values = [node.textContent];
@@ -150,6 +150,22 @@ function calculate_stats(filtered_items, stats_date) {
     const views_old  = downloads - month;
     const ratio_old  = parseFloat((views_old / days_old).toFixed(3));
 
+    // Get collections and count favorites
+    const collection_node = doc.querySelector("arr[name='collection']");
+    let   favorites       = 0;
+    
+    if (collection_node) {
+      if (collection_node.tagName.toLowerCase() === "arr") {
+        // Handle array of collections
+        const collections = Array.from(collection_node.querySelectorAll("str")).map(n => n.textContent);
+        favorites = collections.filter(c => c.toLowerCase().startsWith("fav-")).length;
+      } else {
+        // Handle single collection
+        const collection = collection_node.textContent;
+        favorites = collection.toLowerCase().startsWith("fav-") ? 1 : 0;
+      }
+    }
+
     return {
       identifier,
       title     ,
@@ -160,7 +176,8 @@ function calculate_stats(filtered_items, stats_date) {
       views_23  :              month - week,
       ratio_23  : parseFloat(((month - week) / 23).toFixed(3)),
       views_7   :                      week,
-      ratio_7   : parseFloat(         (week  /  7).toFixed(3))
+      ratio_7   : parseFloat(         (week  /  7).toFixed(3)),
+      favorites
     };
   });
   return results;
@@ -230,16 +247,19 @@ function get_grow_fixed(curr, prev) {
                           return "---";
 }
 
-function render_stats(results, date, container) {
-  // Sorting results
+function sort_results(results) {
   results.sort((a, b) => { // Descending for views
     if (a.ratio_old !== b.ratio_old) { return b.ratio_old - a.ratio_old; }
     if (a.ratio_23  !== b.ratio_23 ) { return b.ratio_23  - a.ratio_23;  }
     if (a.ratio_7   !== b.ratio_7  ) { return b.ratio_7   - a.ratio_7;   }
     return a.title.localeCompare(b.title); // Ascending for titles: A >> Z
   });
+}
 
-  // Show stats: min, 10%, 25%, 50%, 75%, 90%, max
+function render_stats(results, date, container) {
+  sort_results(results);
+
+  // Show stats: Min, 10%, 25%, 50%, 75%, 90%, Max
   const stats_text = document.createElement("div");
   stats_text.className = "text-center";
   stats_text.style.color = "#696969"; // DimGray, L41
@@ -279,15 +299,26 @@ function render_results(results_curr, results_prev) {
   const container = document.getElementById("results");
         container.innerHTML = "";
 
-  if (results_curr.length === 0) {
+  if ((results_curr.length === 0) && (results_prev.length === 0)) {
     container.innerHTML = '<div class="text-center text-comment">No items matched the filters</div>';
     return;
   }
 
-  if (results_prev.length !== results_curr.length) {
-    container.innerHTML = '<div class="text-center text-comment">Stats are different in items count</div>';
-    return;
-  }
+  // Lookup helper
+  const results_curr_ids = {};
+  results_curr.forEach(item => {
+    results_curr_ids[item.identifier] = true;
+  });
+
+  // Create expanded results array
+  const results_curr_exp = results_curr.map(item => ({ ...item, is_exp: false }));
+
+  // Add items from results_prev that aren't in results_curr
+  results_prev.forEach(item => {
+    if (!results_curr_ids[item.identifier]) {
+      results_curr_exp.push({ ...item, is_exp: true });
+    }
+  });
 
   // Build a map of prev results by identifier
   const map_prev = {};
@@ -295,21 +326,9 @@ function render_results(results_curr, results_prev) {
     map_prev[item.identifier] = item;
   });
 
-  // Check for complete linking
-  const new_curr_items = results_curr.filter(item => 
-    !map_prev.hasOwnProperty(item.identifier)
-  );
-
-  if (new_curr_items.length > 0) {
-    container.innerHTML = '<div class="text-center text-comment">' +
-      new_curr_items.length + ' new item' + (new_curr_items.length === 1 ? "" : 's') +
-      ' appeared in current stat</div>';
-    return;
-  }
-
-  // Mediatype counts displaying
+  // Mediatype counts displaying (for expanded results)
   const mediatype_counts = { movies: 0, audio: 0 };
-  results_curr.forEach(item => {
+  results_curr_exp.forEach(item => {
     if (item.mediatype === "movies") mediatype_counts.movies++;
     if (item.mediatype === "audio" ) mediatype_counts.audio++;
   });
@@ -322,13 +341,16 @@ function render_results(results_curr, results_prev) {
                           'Video ' + mediatype_counts.movies + ')';
   container.appendChild(count_div);
 
+  // Both stats displaying
   render_stats(results_prev, stat_prev_date, container); // Also sorts results_prev
   render_stats(results_curr, stat_curr_date, container); // Also sorts results_curr
 
   container.lastElementChild.style.marginBottom = "1em"; // Add space before item list
 
+  sort_results(results_curr_exp);
+
   // Show item list with flex alignment
-  results_curr.forEach((item, index) => {
+  results_curr_exp.forEach((item, index) => {
     // 1. Outer wrapper (for spacing/divider)
     const wrapper = document.createElement("div");
     wrapper.className = "item-wrapper";
@@ -358,21 +380,27 @@ function render_results(results_curr, results_prev) {
     // 4.2. Prev: old stat line
     const stat_prev_old = document.createElement("div");
     stat_prev_old.className   ="item-stat-old";
-    stat_prev_old.textContent = item_prev.views_old.toString().padStart(6) + " /" +
-                                item_prev.days_old .toString().padStart(5) + " =" +
-                                item_prev.ratio_old.toFixed(3).padStart(7);
+    stat_prev_old.textContent = item_prev
+                              ? item_prev.views_old.toString().padStart( 6) + " /" +
+                                item_prev.days_old .toString().padStart( 5) + " =" +
+                                item_prev.ratio_old.toFixed(3).padStart( 7)
+                              :                             "".padStart(22);
 
     // 4.3. Prev: 23-day stat line
     const stat_prev_23 = document.createElement("div");
     stat_prev_23.className   ="item-stat-23";
-    stat_prev_23.textContent = item_prev.views_23.toString().padStart(6) + " /   23 =" +
-                               item_prev.ratio_23.toFixed(3).padStart(7);
+    stat_prev_23.textContent = item_prev
+                             ? item_prev.views_23.toString().padStart( 6) + " /   23 =" +
+                               item_prev.ratio_23.toFixed(3).padStart( 7)
+                             :                            "".padStart(22);
 
     // 4.4. Prev: 7-day stat line
     const stat_prev_7 = document.createElement("div");
     stat_prev_7.className   ="item-stat-7";
-    stat_prev_7.textContent = item_prev.views_7.toString().padStart(6) + " /    7 =" +
-                              item_prev.ratio_7.toFixed(3).padStart(7);
+    stat_prev_7.textContent = item_prev
+                            ? item_prev.views_7.toString().padStart( 6) + " /    7 =" +
+                              item_prev.ratio_7.toFixed(3).padStart( 7)
+                            :                           "".padStart(22);
 
     // 4.5. Prev: assemble the hierarchy
     stat_prev_container.appendChild(stat_prev_old);
@@ -419,21 +447,21 @@ function render_results(results_curr, results_prev) {
     const stat_grow_old = document.createElement("div");
     stat_grow_old.className ="item-grow-old";
 
-    const grow_old = get_grow_ratio(item.ratio_old, item_prev.ratio_old);
+    const grow_old = item_prev ? get_grow_ratio(item.ratio_old, item_prev.ratio_old) : "   ";
     stat_grow_old.textContent = grow_old;
 
     // 7.3. Grow: 23
     const stat_grow_23 = document.createElement("div");
     stat_grow_23.className ="item-grow-23";
 
-    const grow_23 = get_grow_fixed(item.views_23, item_prev.views_23);
+    const grow_23 = item_prev ? get_grow_fixed(item.views_23, item_prev.views_23) : "   ";
     stat_grow_23.textContent = grow_23;
 
     // 7.4. Grow: 7
     const stat_grow_7 = document.createElement("div");
     stat_grow_7.className ="item-grow-7";
 
-    const grow_7 = get_grow_fixed(item.views_7, item_prev.views_7);
+    const grow_7 = item_prev ? get_grow_fixed(item.views_7, item_prev.views_7) : "   ";
     stat_grow_7.textContent = grow_7;
 
     // 7.5. Grow: assemble the hierarchy
@@ -471,7 +499,7 @@ function init_controls() {
   });
 
   // 2. Add click to button
-  const button = document.getElementById("process-button");
+  const button = document.getElementById("process-filter");
   if   (button) {
     button.onclick = process_filtered_range;
   }

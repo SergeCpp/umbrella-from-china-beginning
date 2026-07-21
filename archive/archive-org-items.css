@@ -8,7 +8,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-/*background-color: #7f7fff; */ /* For testing */
+/*background-color: #8f7fff7f; */ /* For testing */
 }
 .item-title a {
   color: inherit; /* Use parent text color */
@@ -18,7 +18,7 @@
 .item-spacer {
   flex: 0 0 1em;
   height: 1em;
-/*background-color: #ef6f6f; */ /* For testing */
+/*background-color: #ef6f6f7f; */ /* For testing */
 }
 .item-stat-container {
   align-items: flex-end; /* Right-align all stat */
@@ -27,7 +27,7 @@
   flex-direction: column;
   font-family: monospace;
   white-space: pre;
-/*background-color: #00cf00; */ /* For testing */
+/*background-color: #00cf007f; */ /* For testing */
 }
 .item-stat-old {
   color: black;
@@ -45,7 +45,7 @@
   font-family: monospace;
   white-space: pre;
   margin-left: 0.3em;
-/*background-color: #ef6f6f; */ /* For testing */
+/*background-color: #ef6f6f7f; */ /* For testing */
 }
 .item-grow-old {
   color: black;
@@ -62,7 +62,7 @@
   border-bottom-color: #ebebeb; /* Gray92 */
   border-bottom-style: solid;
   border-bottom-width: medium;
-/*background-color: #7f7fff; */ /* For testing */
+/*background-color: #8f7fff7f; */ /* For testing */
 }
 .item-wrapper:last-child {
   border-bottom: none;
