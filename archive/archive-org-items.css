@@ -12,7 +12,7 @@
 }
 .item-title a {
   color: inherit; /* Use parent text color */
-  display: block; /* Ensures full title is clickable */
+  display: block; /* Ensures full title area is clickable */
   text-decoration: none;
 }
 .item-spacer {
@@ -30,7 +30,8 @@
 /*background-color: #00cf00; */ /* For testing */
 }
 .item-stat-old {
-  font-weight: normal;
+  color: black;
+  font-weight: normal; /* bold; */
 }
 .item-stat-23,
 .item-stat-7 {
@@ -47,7 +48,8 @@
 /*background-color: #ef6f6f; */ /* For testing */
 }
 .item-grow-old {
-  font-weight: normal;
+  color: black;
+  font-weight: normal; /* bold; */
 }
 .item-grow-23,
 .item-grow-7 {

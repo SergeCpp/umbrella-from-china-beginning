@@ -1,10 +1,10 @@
 /* Global Variables */
 
-const stats_curr_date  = "2025-07-23";
-let   stats_curr_items = [];
+const stat_curr_date  = "2025-07-23";
+let   stat_curr_items = [];
 
-const stats_prev_date  = "2025-07-21";
-let   stats_prev_items = [];
+const stat_prev_date  = "2025-07-21";
+let   stat_prev_items = [];
 
 /* Startup Run */
 
@@ -15,32 +15,32 @@ process_stats();
 
 function filter_items(items, archived_min, archived_max, created_min, created_max) {
   const filtered_items = items.filter(doc => {
-    const publicdate_node = doc.querySelector("str[name='publicdate']");
+    const identifier_node = doc.querySelector("str[name='identifier']");
+    const title_node      = doc.querySelector("str[name='title']"     );
+    const mediatype_node  = doc.querySelector("str[name='mediatype']" );
     const date_node       = doc.querySelector("str[name='date']"      );
+    const publicdate_node = doc.querySelector("str[name='publicdate']");
     const downloads_node  = doc.querySelector("str[name='downloads']" );
     const month_node      = doc.querySelector("str[name='month']"     );
     const week_node       = doc.querySelector("str[name='week']"      );
-    const mediatype_node  = doc.querySelector("str[name='mediatype']" );
-    const identifier_node = doc.querySelector("str[name='identifier']");
 
-    if (!publicdate_node ||
-        !downloads_node  || !month_node || !week_node ||
-        !mediatype_node  || !identifier_node) {
+    if (!identifier_node || !title_node || !mediatype_node ||
+        !publicdate_node ||
+        !downloads_node  || !month_node || !week_node) {
       return false;
     }
 
-    // Archived
-    const publicdate = new Date(publicdate_node.textContent);
-    if (isNaN(publicdate.getTime())) return false;
-    const archived_ok = (publicdate >= archived_min) && (publicdate <= archived_max);
+    // Mediatype
+    const mediatype     =  mediatype_node.textContent;
+    const is_collection = (mediatype === "collection");
+    const is_texts      = (mediatype === "texts"     );
 
     // Created
-    const mediatype = mediatype_node.textContent;
-    let   date      = null;
+    let date = null;
 
     if (!date_node) {
-      if (mediatype === "audio") { // Set default date for audio items
-        date = new Date("2012-01-01T00:00:00Z"); // UTC date, earliest for entire stats
+      if (mediatype === "audio") { // Set default date to audio items
+        date = new Date("2012-01-01T00:00:00Z"); // UTC date, earliest for entire stat
       } else {
         return false;
       }
@@ -51,6 +51,11 @@ function filter_items(items, archived_min, archived_max, created_min, created_ma
 
     const created_ok = (date >= created_min) && (date <= created_max);
 
+    // Archived
+    const publicdate = new Date(publicdate_node.textContent);
+    if (isNaN(publicdate.getTime())) return false;
+    const archived_ok = (publicdate >= archived_min) && (publicdate <= archived_max);
+
     // Views
     const downloads = parseInt(downloads_node.textContent, 10);
     const month     = parseInt(month_node    .textContent, 10);
@@ -59,23 +64,21 @@ function filter_items(items, archived_min, archived_max, created_min, created_ma
     if (isNaN(downloads) || isNaN(month) || isNaN(week)) return false;
     if ((downloads < month) || (month < week)) return false;
 
-    // Mediatype
-    const is_collection = (mediatype === "collection");
-    const is_texts      = (mediatype === "texts"     );
-
-    return archived_ok && created_ok && !is_collection && !is_texts;
+    // Check all
+    return !is_collection && !is_texts && created_ok && archived_ok;
   });
   return filtered_items;
 }
 
 function calculate_stats(filtered_items, stats_date) {
   const results = filtered_items.map(doc => {
+    const identifier =          doc.querySelector("str[name='identifier']").textContent;
+    const title      =          doc.querySelector("str[name='title']"     ).textContent;
+    const mediatype  =          doc.querySelector("str[name='mediatype']" ).textContent;
     const publicdate = new Date(doc.querySelector("str[name='publicdate']").textContent);
     const downloads  = parseInt(doc.querySelector("str[name='downloads']" ).textContent, 10);
     const month      = parseInt(doc.querySelector("str[name='month']"     ).textContent, 10);
     const week       = parseInt(doc.querySelector("str[name='week']"      ).textContent, 10);
-    const mediatype  =          doc.querySelector("str[name='mediatype']" ).textContent;
-    const identifier =          doc.querySelector("str[name='identifier']").textContent;
 
     const calc_date  = new Date(stats_date + 'T12:00:00Z');
     const days_old   = Math.floor((calc_date - publicdate) / (24 * 60 * 60 * 1000)) - 30;
@@ -83,16 +86,16 @@ function calculate_stats(filtered_items, stats_date) {
     const ratio_old  = parseFloat((views_old / days_old).toFixed(3));
 
     return {
-      title    : doc.querySelector("str[name='title']")?.textContent || "Untitled",
-      views_old,
-      days_old ,
-      ratio_old,
-      views_23 :  month - week,
-      ratio_23 : (month - week) / 23,
-      views_7  : week,
-      ratio_7  : week / 7,
-      mediatype,
-      identifier
+      identifier,
+      title     ,
+      mediatype ,
+      days_old  ,
+      views_old ,
+      ratio_old ,
+      views_23  :              month - week,
+      ratio_23  : parseFloat(((month - week) / 23).toFixed(3)),
+      views_7   :                      week,
+      ratio_7   : parseFloat(         (week  /  7).toFixed(3))
     };
   });
   return results;
@@ -100,29 +103,111 @@ function calculate_stats(filtered_items, stats_date) {
 
 /* Display */
 
-function get_grow(curr, prev) {
-  const ratio = prev !== 0
-              ? curr / prev
-              : curr === 0
-              ? 1
-              : 123;
+function get_grow_ratio(curr, prev) {
+  if  (!curr && !prev) { return "   "; }
 
-  if (ratio === 1) { return "   "; }
+  if  (!prev) {
+    if (curr <= 0.05)  { return ".  "; }
+    if (curr <= 0.10)  { return ".. "; }
+    if (curr <= 0.15)  { return "..."; }
 
-  if ((ratio >= 0.99) && (ratio <= 1.01)) { return ".  "; }
-  if ((ratio >= 0.98) && (ratio <= 1.02)) { return ".. "; }
-  if ((ratio >= 0.97) && (ratio <= 1.03)) { return "..."; }
+    if (curr <= 0.25)  { return "+  "; }
+    if (curr <= 0.50)  { return "++ "; }
+                         return "+++";
+  }
+
+  if  (!curr) {
+    if (prev <= 0.05)  { return ".  "; }
+    if (prev <= 0.10)  { return ".. "; }
+    if (prev <= 0.15)  { return "..."; }
+
+    if (prev <= 0.25)  { return "-  "; }
+    if (prev <= 0.50)  { return "-- "; }
+                         return "---";
+  }
+
+  const ratio = curr / prev;
+
+  if   (ratio === 1)   { return "   "; }
+
+  if  ((ratio >= 0.99) && (ratio <= 1.01)) { return ".  "; }
+  if  ((ratio >= 0.98) && (ratio <= 1.02)) { return ".. "; }
+  if  ((ratio >= 0.97) && (ratio <= 1.03)) { return "..."; }
 
   if   (ratio >  1) {
     if (ratio <= 1.05) { return "+  "; }
     if (ratio <= 1.07) { return "++ "; }
                          return "+++";
   }
+  //    ratio <  1
+  if   (ratio >= 0.95) { return "-  "; }
+  if   (ratio >= 0.93) { return "-- "; }
+                         return "---";
+}
 
-  //  ratio <  1
-  if (ratio >= 0.95) { return "-  "; }
-  if (ratio >= 0.93) { return "-- "; }
-                       return "---";
+function get_grow_fixed(curr, prev) {
+  const diff = curr - prev;
+  if   (diff     === 0) { return "   "; }
+
+  const diff_abs = Math.abs(diff);
+  if   (diff_abs === 1) { return ".  "; }
+  if   (diff_abs === 2) { return ".. "; }
+  if   (diff_abs === 3) { return "..."; }
+
+  if   (diff     >   0) {
+    if (diff_abs <=  5) { return "+  "; }
+    if (diff_abs <=  7) { return "++ "; }
+                          return "+++";
+  }
+  //    diff     <   0
+  if   (diff_abs <=  5) { return "-  "; }
+  if   (diff_abs <=  7) { return "-- "; }
+                          return "---";
+}
+
+function render_stats(results, date, container) {
+  // Sorting results
+  results.sort((a, b) => { // Descending for views
+    if (a.ratio_old !== b.ratio_old) { return b.ratio_old - a.ratio_old; }
+    if (a.ratio_23  !== b.ratio_23 ) { return b.ratio_23  - a.ratio_23;  }
+    if (a.ratio_7   !== b.ratio_7  ) { return b.ratio_7   - a.ratio_7;   }
+    return a.title.localeCompare(b.title); // Ascending for titles: A >> Z
+  });
+
+  // Show stats: min, 10%, 25%, 50%, 75%, 90%, max
+  const stats_text = document.createElement("div");
+  stats_text.className = "text-center";
+  stats_text.style.color = "#696969"; // DimGray, L41
+//stats_text.style.fontFamily = "monospace";
+  stats_text.style.fontSize = "0.8em";
+
+  // Calculate stats from sorted results
+  const max = results[0                 ]?.ratio_old || 0;
+  const min = results[results.length - 1]?.ratio_old || 0;
+
+  // Simple percentile approximations (array is already sorted)
+  const get_percentile = (percent) => {
+    const index = Math.floor((100 - percent) / 100 * results.length);
+    return results[index]?.ratio_old || 0;
+  };
+
+  const percentile10 = get_percentile(10);
+  const quartile1    = get_percentile(25);
+  const median       = get_percentile(50);
+  const quartile3    = get_percentile(75);
+  const percentile90 = get_percentile(90);
+
+  stats_text.textContent =
+             date                    + ' : ' +
+    'Min ' + min         .toFixed(3) + ' / ' +
+    '10% ' + percentile10.toFixed(3) + ' / ' +
+    '25% ' + quartile1   .toFixed(3) + ' / ' +
+    '50% ' + median      .toFixed(3) + ' / ' +
+    '75% ' + quartile3   .toFixed(3) + ' / ' +
+    '90% ' + percentile90.toFixed(3) + ' / ' +
+    'Max ' + max         .toFixed(3);
+
+  container.appendChild(stats_text);
 }
 
 function render_results(results_curr, results_prev) {
@@ -139,63 +224,41 @@ function render_results(results_curr, results_prev) {
     return;
   }
 
-  results_curr.sort((a, b) => { // Descending for views
-    if (a.ratio_old !== b.ratio_old) { return b.ratio_old - a.ratio_old; }
-    if (a.ratio_23  !== b.ratio_23 ) { return b.ratio_23  - a.ratio_23;  }
-    if (a.ratio_7   !== b.ratio_7  ) { return b.ratio_7   - a.ratio_7;   }
-    return a.title.localeCompare(b.title); // Ascending for titles: A >> Z
-  });
-
   // Build a map of prev results by identifier
   const map_prev = {};
   results_prev.forEach(item => {
     map_prev[item.identifier] = item;
   });
 
-  const mediatypeCounts = { movies: 0, audio: 0 };
+  // Check for complete linking
+  const new_curr_items = results_curr.filter(item => 
+    !map_prev.hasOwnProperty(item.identifier)
+  );
+
+  if (new_curr_items.length > 0) {
+    container.innerHTML = '<div class="text-center text-comment">' +
+      new_curr_items.length + ' new item' + (new_curr_items.length === 1 ? "" : 's') +
+      ' appeared in current stat</div>';
+    return;
+  }
+
+  // Mediatype counts displaying
+  const mediatype_counts = { movies: 0, audio: 0 };
   results_curr.forEach(item => {
-    if (item.mediatype === "movies") mediatypeCounts.movies++;
-    if (item.mediatype === "audio" ) mediatypeCounts.audio++;
+    if (item.mediatype === "movies") mediatype_counts.movies++;
+    if (item.mediatype === "audio" ) mediatype_counts.audio++;
   });
 
-  const total = mediatypeCounts.movies + mediatypeCounts.audio;
-  const countDiv = document.createElement("div");
-  countDiv.className = "text-center subtitle";
-  countDiv.innerHTML = 'Stats ' + stats_prev_date + ' &ndash; ' + stats_curr_date + ' / ' +
-                       'Total ' + total + ' ' +
-                      '(Audio ' + mediatypeCounts.audio  + ' / Video ' + mediatypeCounts.movies + ')';
-  container.appendChild(countDiv);
+  const total = mediatype_counts.movies + mediatype_counts.audio;
+  const count_div = document.createElement("div");
+  count_div.className = "subtitle text-center text-normal";
+  count_div.textContent = 'Total ' + total + ' ' +
+                         '(Audio ' + mediatype_counts.audio  + ' / ' +
+                          'Video ' + mediatype_counts.movies + ')';
+  container.appendChild(count_div);
 
-  // Show stats: min, 10%, 25%, 50%, 75%, 90%, max
-  const statsText = document.createElement("div");
-  statsText.className = "text-center";
-  statsText.style.color = "#696969"; // DimGray, L41
-
-  // Calculate stats from sorted results
-  const max = results_curr[0                      ]?.ratio_old || 0;
-  const min = results_curr[results_curr.length - 1]?.ratio_old || 0;
-
-  // Simple percentile approximations (array is already sorted)
-  const getPercentile = (percent) => {
-    const index = Math.floor((100 - percent) / 100 * results_curr.length);
-    return results_curr[index]?.ratio_old || 0;
-  };
-
-  const percentile10 = getPercentile(10);
-  const quartile1    = getPercentile(25);
-  const median       = getPercentile(50);
-  const quartile3    = getPercentile(75);
-  const percentile90 = getPercentile(90);
-
-  statsText.textContent = 'Min ' + min         .toFixed(3) + ' / ' +
-                          '10% ' + percentile10.toFixed(3) + ' / ' +
-                          '25% ' + quartile1   .toFixed(3) + ' / ' +
-                          '50% ' + median      .toFixed(3) + ' / ' +
-                          '75% ' + quartile3   .toFixed(3) + ' / ' +
-                          '90% ' + percentile90.toFixed(3) + ' / ' +
-                          'Max ' + max         .toFixed(3);
-
-  container.appendChild(statsText);
+  render_stats(results_prev, stat_prev_date, container); // also sorts results_prev
+  render_stats(results_curr, stat_curr_date, container); // also sorts results_curr
 
   // Show item list with flex alignment
   results_curr.forEach((item, index) => {
@@ -289,21 +352,21 @@ function render_results(results_curr, results_prev) {
     const stat_grow_old = document.createElement("div");
     stat_grow_old.className ="item-grow-old";
 
-    const grow_old = get_grow(item.ratio_old, item_prev.ratio_old);
+    const grow_old = get_grow_ratio(item.ratio_old, item_prev.ratio_old);
     stat_grow_old.textContent = grow_old;
 
     // 7.3. Grow: 23
     const stat_grow_23 = document.createElement("div");
     stat_grow_23.className ="item-grow-23";
 
-    const grow_23 = get_grow(item.ratio_23, item_prev.ratio_23);
+    const grow_23 = get_grow_fixed(item.views_23, item_prev.views_23);
     stat_grow_23.textContent = grow_23;
 
     // 7.4. Grow: 7
     const stat_grow_7 = document.createElement("div");
     stat_grow_7.className ="item-grow-7";
 
-    const grow_7 = get_grow(item.ratio_7, item_prev.ratio_7);
+    const grow_7 = get_grow_fixed(item.views_7, item_prev.views_7);
     stat_grow_7.textContent = grow_7;
 
     // 7.5. Grow: assemble the hierarchy
@@ -439,11 +502,11 @@ function process_filtered_range() {
   }
 
   // Process
-  const filtered_curr_items = filter_items(stats_curr_items, archived_min, archived_max, created_min, created_max);
-  const filtered_prev_items = filter_items(stats_prev_items, archived_min, archived_max, created_min, created_max);
+  const filtered_curr_items = filter_items(stat_curr_items, archived_min, archived_max, created_min, created_max);
+  const filtered_prev_items = filter_items(stat_prev_items, archived_min, archived_max, created_min, created_max);
 
-  const results_curr = calculate_stats(filtered_curr_items, stats_curr_date);
-  const results_prev = calculate_stats(filtered_prev_items, stats_prev_date);
+  const results_curr = calculate_stats(filtered_curr_items, stat_curr_date);
+  const results_prev = calculate_stats(filtered_prev_items, stat_prev_date);
 
   render_results(results_curr, results_prev);
 }
@@ -454,16 +517,16 @@ function process_stats() {
   const container = document.getElementById("results");
         container.innerHTML = '<div class="text-center text-comment">Loading...</div>';
 
-  const xml_url_curr = "/archive/archive-org-sergecpp-" + stats_curr_date + ".xml.txt";
-  const xml_url_prev = "/archive/archive-org-sergecpp-" + stats_prev_date + ".xml.txt";
+  const xml_url_curr = "/archive/archive-org-sergecpp-" + stat_curr_date + ".xml.txt";
+  const xml_url_prev = "/archive/archive-org-sergecpp-" + stat_prev_date + ".xml.txt";
 
   Promise.all([
     fetch(xml_url_curr).then(response => {
-      if (!response.ok) { throw new Error(stats_curr_date + " &mdash; XML file not found"); }
+      if (!response.ok) { throw new Error(stat_curr_date + " &mdash; XML file not found"); }
       return response.text();
     }),
     fetch(xml_url_prev).then(response => {
-      if (!response.ok) { throw new Error(stats_prev_date + " &mdash; XML file not found"); }
+      if (!response.ok) { throw new Error(stat_prev_date + " &mdash; XML file not found"); }
       return response.text();
     })
   ])
@@ -471,13 +534,13 @@ function process_stats() {
     const parser = new DOMParser();
 
     const xml_curr = parser.parseFromString(text_curr, "text/xml");
-    if   (xml_curr.querySelector("parsererror")) { throw new Error(stats_curr_date + " &mdash; Invalid XML format"); }
+    if   (xml_curr.querySelector("parsererror")) { throw new Error(stat_curr_date + " &mdash; Invalid XML format"); }
 
     const xml_prev = parser.parseFromString(text_prev, "text/xml");
-    if   (xml_prev.querySelector("parsererror")) { throw new Error(stats_prev_date + " &mdash; Invalid XML format"); }
+    if   (xml_prev.querySelector("parsererror")) { throw new Error(stat_prev_date + " &mdash; Invalid XML format"); }
 
-    stats_curr_items = [...xml_curr.querySelectorAll("doc")];
-    stats_prev_items = [...xml_prev.querySelectorAll("doc")];
+    stat_curr_items = [...xml_curr.querySelectorAll("doc")];
+    stat_prev_items = [...xml_prev.querySelectorAll("doc")];
 
     // Initial Filters
     const archived_min = new Date(Date.UTC(2022, 05-1, 06, 00, 00, 00)); // 2022-05-06 (UTC, months are 0-based)
@@ -487,11 +550,11 @@ function process_stats() {
     const created_max  = new Date(Date.UTC(2024, 10-1, 19, 23, 59, 59)); // 2024-10-19 (UTC, months are 0-based)
 
     // Process
-    const filtered_curr_items = filter_items(stats_curr_items, archived_min, archived_max, created_min, created_max);
-    const filtered_prev_items = filter_items(stats_prev_items, archived_min, archived_max, created_min, created_max);
+    const filtered_curr_items = filter_items(stat_curr_items, archived_min, archived_max, created_min, created_max);
+    const filtered_prev_items = filter_items(stat_prev_items, archived_min, archived_max, created_min, created_max);
 
-    const results_curr        = calculate_stats(filtered_curr_items, stats_curr_date);
-    const results_prev        = calculate_stats(filtered_prev_items, stats_prev_date);
+    const results_curr        = calculate_stats(filtered_curr_items, stat_curr_date);
+    const results_prev        = calculate_stats(filtered_prev_items, stat_prev_date);
 
     render_results(results_curr, results_prev);
   })
