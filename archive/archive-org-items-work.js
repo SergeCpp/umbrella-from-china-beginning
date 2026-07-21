@@ -322,8 +322,10 @@ function render_results(results_curr, results_prev) {
                           'Video ' + mediatype_counts.movies + ')';
   container.appendChild(count_div);
 
-  render_stats(results_prev, stat_prev_date, container); // also sorts results_prev
-  render_stats(results_curr, stat_curr_date, container); // also sorts results_curr
+  render_stats(results_prev, stat_prev_date, container); // Also sorts results_prev
+  render_stats(results_curr, stat_curr_date, container); // Also sorts results_curr
+
+  container.lastElementChild.style.marginBottom = "1em"; // Add space before item list
 
   // Show item list with flex alignment
   results_curr.forEach((item, index) => {
@@ -558,7 +560,7 @@ function parse_advanced_term(term) {
   else {
     return {
       type: "PLAIN",
-      term: term
+      term: term.replace(/"/g, "")
     };
   }
 }
@@ -569,7 +571,7 @@ function clean_filter_input(input) {
     .split  (',')
     .map    (term => term.trim())
     .filter (term => term) // Non-empty only
-    .filter (term => /^[a-zA-Z0-9_\- ]+$/.test(term)) // Of allowed characters only
+    .filter (term => /^[a-zA-Z0-9_\-" ]+$/.test(term)) // Of allowed characters only
     .map    (parse_advanced_term);
 }
 

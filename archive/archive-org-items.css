@@ -66,7 +66,7 @@
 }
 .item-wrapper:last-child {
   border-bottom: none;
-  margin-bottom: 1rem;
+  margin-bottom: 1em;
 }
 
 /* EOF */
