@@ -40,21 +40,58 @@
 &amp;sort[]=publicdate+desc&amp;rows=839&amp;page=1
 &amp;callback=callback&amp;output=xml">Internet Archive Query</a></div>
 
-<div class="text-center" style="margin: 0.5em 0;"><label
-     style="margin-right:1em">Archived&nbsp;<input
-     id   ="archived-min" minlength="10" maxlength="10" size ="5"
-     type ="text" value="2022-05-06">&nbsp;&ndash;&nbsp;<input
-     id   ="archived-max" minlength="10" maxlength="10" size ="5"
-     type ="text" value="2025-03-08"></label><label
-     style="margin-right:1em">Created&nbsp;<input
-     id   ="created-min" minlength="10" maxlength="10" size ="5"
-     type ="text" value="2012-01-01">&nbsp;&ndash;&nbsp;<input
-     id   ="created-max" minlength="10" maxlength="10" size ="5"
-     type ="text" value="2024-10-19"></label><button
-     id   ="process-button">Process</button></div>
+<div class      ="text-center"
+     style      ="font-family:monospace; margin: 0.5em 0;"><input
+     id         ="created-min"
+     style      ="font-family:monospace;"
+     type       ="text"
+     size       ="10"
+     minlength  = "4"
+     maxlength  ="10"
+     value      ="2012-01-01">&nbsp;&lt;created&gt;&nbsp;<input
+     id         ="created-max"
+     style      ="font-family:monospace;"
+     type       ="text"
+     size       ="10"
+     minlength  = "4"
+     maxlength  ="10"
+     value      ="2024-10-19">&nbsp;<button
+     id         ="process-button"
+     style      ="font-family:monospace;">Process</button>&nbsp;<input
+     id         ="archived-min"
+     style      ="font-family:monospace;"
+     type       ="text"
+     size       ="10"
+     minlength  = "4"
+     maxlength  ="10"
+     value      ="2022-05-06">&nbsp;&lt;archived&gt;&nbsp;<input
+     id         ="archived-max"
+     style      ="font-family:monospace;"
+     type       ="text"
+     size       ="10"
+     minlength  = "4"
+     maxlength  ="10"
+     value      ="2025-03-08"></div>
+
+<div class      ="text-center"
+     style      ="font-family:monospace; margin: 0.5em 0;"><input
+     id         ="collections"
+     style      ="font-family:monospace;"
+     type       ="text"
+     size       ="80"
+     maxlength  ="80"
+     placeholder="Collections: chinese-beauty, chinese-clothing, chinese-dance / AND NOT"></div>
+
+<div class      ="text-center"
+     style      ="font-family:monospace; margin: 0.5em 0;"><input
+     id         ="creators"
+     style      ="font-family:monospace;"
+     type       ="text"
+     size       ="80"
+     maxlength  ="80"
+     placeholder="Creators: Ziyan, Xiaodan, Qisan / AND NOT"></div>
 
 <!--
-creators comma-delimited
 favorites count
 -->
 

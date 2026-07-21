@@ -13,7 +13,87 @@ process_stats();
 
 /* Items */
 
-function filter_items(items, archived_min, archived_max, created_min, created_max) {
+function evaluate_term(termObj, values, match_fn) {
+  switch(termObj.type) {
+    case "AND":
+      return termObj.terms.every(subTerm => 
+        evaluate_term(subTerm, values, match_fn)
+      );
+
+    case "NOT":
+      const mainMatches = termObj.main
+                        ? evaluate_term(termObj.main, values, match_fn)
+                        : true; // Nothing from left
+      const exclusionMatches = evaluate_term(termObj.exclusion, values, match_fn);
+//      const exclusionMatches = values.some(value =>
+//        match_fn(value, termObj.exclusion)
+//      );
+      return mainMatches && !exclusionMatches;
+
+    case "PLAIN":
+      return values.some(value => match_fn(value, termObj.term));
+
+    default:
+      return false;
+  }
+}
+
+function filter_matches(doc, field, terms, match_fn) {
+  if (!terms)              return true; // No    filter = match all
+  if  (terms.length === 0) return true; // Empty filter = match all
+
+  // Get all values for this field (handles both <arr> and <str>)
+  const node = doc.querySelector('arr[name="' + field + '"], str[name="' + field + '"]');
+  let values = [];
+
+  if (node) {
+    if (node.tagName === "ARR") {
+      values = Array.from(node.querySelectorAll("str")).map(n => n.textContent);
+    } else {
+      values = [node.textContent];
+    }
+  }
+
+  // Check if any term matches
+  return terms.some(term_obj => {
+    return evaluate_term(term_obj, values, match_fn);
+  });
+
+  /*
+  // Check if any term matches based on its type
+  return terms.some(term_obj => {
+    switch(term_obj.type) {
+      case "AND":
+        // ALL terms must match
+        return term_obj.terms.every(sub_term => 
+          values.some(value => match_fn(value, sub_term))
+        );
+
+      case "NOT":
+        // Main term must match, exclusion must NOT match
+        const main_matches      = values.some(value => match_fn(value, term_obj.main));
+        const exclusion_matches = values.some(value => match_fn(value, term_obj.exclusion));
+        return main_matches && !exclusion_matches;
+
+      case "PLAIN":
+        // Current OR behavior (comma-separated terms)
+        return values.some(value => match_fn(value, term_obj.term));
+
+      default:
+        return false;
+    }
+  });
+  */
+
+  /*
+  // Check if any term matches any value
+  return terms.some(term => 
+    values.some(value => match_fn(value, term))
+  );
+  */
+}
+
+function filter_items(items, archived_min, archived_max, created_min, created_max, collections, creators) {
   const filtered_items = items.filter(doc => {
     const identifier_node = doc.querySelector("str[name='identifier']");
     const title_node      = doc.querySelector("str[name='title']"     );
@@ -64,8 +144,24 @@ function filter_items(items, archived_min, archived_max, created_min, created_ma
     if (isNaN(downloads) || isNaN(month) || isNaN(week)) return false;
     if ((downloads < month) || (month < week)) return false;
 
+    // Collections
+    const matches_collections = filter_matches(
+      doc,
+     "collection",
+      collections,
+      (value, term) => value.toLowerCase().includes(term.toLowerCase())
+    );
+
+    // Creators
+    const matches_creators = filter_matches(
+      doc,
+     "creator",
+      creators,
+      (value, term) => value.toLowerCase().includes(term.toLowerCase())
+    );
+
     // Check all
-    return !is_collection && !is_texts && created_ok && archived_ok;
+    return !is_collection && !is_texts && created_ok && archived_ok && matches_collections && matches_creators;
   });
   return filtered_items;
 }
@@ -179,7 +275,7 @@ function render_stats(results, date, container) {
   stats_text.className = "text-center";
   stats_text.style.color = "#696969"; // DimGray, L41
 //stats_text.style.fontFamily = "monospace";
-  stats_text.style.fontSize = "0.8em";
+//stats_text.style.fontSize = "0.8em";
 
   // Calculate stats from sorted results
   const max = results[0                 ]?.ratio_old || 0;
@@ -391,7 +487,8 @@ function render_results(results_curr, results_prev) {
 
 function init_controls() {
   // 1. Add Enter key to all date inputs
-  ["archived-min", "archived-max", "created-min", "created-max"].forEach(id => {
+  ["archived-min", "archived-max", "created-min", "created-max", "collections", "creators"]
+  .forEach(id => {
     const input = document.getElementById(id);
     if   (input) {
       input.onkeyup = function(event) {
@@ -456,6 +553,50 @@ function get_date_range(date_str) {
   return null; // Invalid format
 }
 
+function parse_advanced_term(term) {
+  // Check for NOT first (higher precedence)
+  if(term.substring(0, 4) === "NOT ") { // Leading NOT
+    return {
+      type     : "NOT",
+      main     : null, // Nothing from left
+      exclusion: parse_advanced_term(term.substring(4).trim())
+    }
+  } else if (term.includes(" NOT ")) {
+    const [main, exclusion] = term.split(" NOT ");
+    return {
+      type     : "NOT",
+      main     : parse_advanced_term(main     .trim()),
+      exclusion: parse_advanced_term(exclusion.trim())
+//    exclusion: exclusion.trim()
+    };
+  }
+  // Check for AND next
+  else if (term.includes(" AND ")) {
+    const terms = term.split(" AND ").map(t => parse_advanced_term(t.trim()));
+    return {
+      type: "AND",
+      terms: terms
+    };
+  }
+  // Plain term (OR behavior)
+  else {
+    return {
+      type: "PLAIN",
+      term: term
+    };
+  }
+}
+
+function clean_filter_input(input) {
+  return input
+    .replace(/  +/g, ' ')
+    .split  (',')
+    .map    (term => term.trim())
+    .filter (term => term) // Non-empty only
+    .filter (term => /^[a-zA-Z0-9_\- ]+$/.test(term)) // Of allowed characters only
+    .map    (parse_advanced_term);
+}
+
 function process_filtered_range() {
   const container = document.getElementById("results");
   const err_valid = '<div class="text-center text-comment">Valid dates are: YYYY / YYYY-MM / YYYY-MM-DD</div>';
@@ -501,9 +642,15 @@ function process_filtered_range() {
     return;
   }
 
+  // Collections and Creators
+  const collections = clean_filter_input(document.getElementById("collections").value);
+  const creators    = clean_filter_input(document.getElementById("creators"   ).value);
+
   // Process
-  const filtered_curr_items = filter_items(stat_curr_items, archived_min, archived_max, created_min, created_max);
-  const filtered_prev_items = filter_items(stat_prev_items, archived_min, archived_max, created_min, created_max);
+  const filtered_curr_items = filter_items(
+    stat_curr_items, archived_min, archived_max, created_min, created_max, collections, creators);
+  const filtered_prev_items = filter_items(
+    stat_prev_items, archived_min, archived_max, created_min, created_max, collections, creators);
 
   const results_curr = calculate_stats(filtered_curr_items, stat_curr_date);
   const results_prev = calculate_stats(filtered_prev_items, stat_prev_date);
@@ -542,7 +689,7 @@ function process_stats() {
     stat_curr_items = [...xml_curr.querySelectorAll("doc")];
     stat_prev_items = [...xml_prev.querySelectorAll("doc")];
 
-    // Initial Filters
+    // Initial filters
     const archived_min = new Date(Date.UTC(2022, 05-1, 06, 00, 00, 00)); // 2022-05-06 (UTC, months are 0-based)
     const archived_max = new Date(Date.UTC(2025, 03-1, 08, 23, 59, 59)); // 2025-03-08 (UTC, months are 0-based)
 
@@ -550,8 +697,10 @@ function process_stats() {
     const created_max  = new Date(Date.UTC(2024, 10-1, 19, 23, 59, 59)); // 2024-10-19 (UTC, months are 0-based)
 
     // Process
-    const filtered_curr_items = filter_items(stat_curr_items, archived_min, archived_max, created_min, created_max);
-    const filtered_prev_items = filter_items(stat_prev_items, archived_min, archived_max, created_min, created_max);
+    const filtered_curr_items = filter_items(
+      stat_curr_items, archived_min, archived_max, created_min, created_max, null, null);
+    const filtered_prev_items = filter_items(
+      stat_prev_items, archived_min, archived_max, created_min, created_max, null, null);
 
     const results_curr        = calculate_stats(filtered_curr_items, stat_curr_date);
     const results_prev        = calculate_stats(filtered_prev_items, stat_prev_date);
