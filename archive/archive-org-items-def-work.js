@@ -10,31 +10,24 @@ let   stat_curr_items = [];
 let   stat_prev_date  =  "2025-07-23";
 let   stat_prev_items = [];
 
-/* Startup Run */
-
-init_controls();
-process_stats();
-
 /* Items */
 
 function evaluate_term(term_obj, values, match_fn) {
   switch(term_obj.type) {
     case "AND":
       return term_obj.terms.every(sub_term => 
-        evaluate_term(sub_term, values, match_fn)
-      );
+        evaluate_term(sub_term, values, match_fn));
 
     case "OR":
       return term_obj.terms.some(sub_term => 
-        evaluate_term(sub_term, values, match_fn)
-      );
+        evaluate_term(sub_term, values, match_fn));
 
     case "NOT":
-      const matches_main      = term_obj.main
-                              ? evaluate_term(term_obj.main,      values, match_fn)
-                              : true; // Nothing from left
-      const matches_exclusion = evaluate_term(term_obj.exclusion, values, match_fn);
-      return matches_main && !matches_exclusion;
+      const match_incl = term_obj.incl
+                       ? evaluate_term(term_obj.incl, values, match_fn)
+                       : true; // Nothing from left (to include)
+      const match_excl = evaluate_term(term_obj.excl, values, match_fn);
+      return match_incl && !match_excl;
 
     case "PLAIN":
       return values.some(value => match_fn(value, term_obj.term));
@@ -84,15 +77,15 @@ function filter_items(items, archived_min, archived_max, created_min, created_ma
     }
 
     // Mediatype
-    const mediatype     =  mediatype_node.textContent;
-    const is_collection = (mediatype === "collection");
-    const is_texts      = (mediatype === "texts"     );
+    const mediatype =  mediatype_node.textContent;
+    const is_movies = (mediatype === "movies");
+    const is_audio  = (mediatype === "audio" );
 
     // Created
     let date = null;
 
     if (!date_node) {
-      if (mediatype === "audio") { // Set default date to audio items
+      if (is_audio) { // Set default date to audio items
         date = new Date("2012-01-01T00:00:00Z"); // UTC date, earliest for entire stat
       } else {
         return false;
@@ -133,8 +126,8 @@ function filter_items(items, archived_min, archived_max, created_min, created_ma
       (value, term) => value.toLowerCase().includes(term.toLowerCase())
     );
 
-    // Check all
-    return !is_collection && !is_texts && created_ok && archived_ok && matches_collections && matches_creators;
+    // Check all together
+    return (is_movies || is_audio) && created_ok && archived_ok && matches_collections && matches_creators;
   });
   return filtered_items;
 }
@@ -322,7 +315,8 @@ function render_results(results_curr, results_prev) {
         container.innerHTML = "";
 
   if ((results_curr.length === 0) && (results_prev.length === 0)) {
-    container.innerHTML = '<div class="text-center text-comment">No items matched the filters</div>';
+    container.innerHTML =
+      '<div class="text-center text-comment" style="margin-bottom: 1em;">No items matched the filters</div>';
     return;
   }
 
@@ -517,7 +511,7 @@ function init_controls() {
     if   (input) {
       input.onkeyup = function(event) {
         if (event.key === "Enter") {
-          process_filtered_range();
+          process_filter();
         }
       };
     }
@@ -526,7 +520,7 @@ function init_controls() {
   // 2. Add click to button
   const button = document.getElementById("process-filter");
   if   (button) {
-    button.onclick = process_filtered_range;
+    button.onclick = process_filter;
   }
 }
 
@@ -591,16 +585,16 @@ function parse_advanced_term(term) {
   // Check for NOT next
   else if (term.substring(0, 4) === "NOT ") { // Leading NOT
     return {
-      type     : "NOT",
-      main     : null, // Nothing from left
-      exclusion: parse_advanced_term(term.substring(4).trim())
+      type: "NOT",
+      incl: null, // Nothing from left (to include)
+      excl: parse_advanced_term(term.substring(4).trim())
     }
   } else if (term.includes(" NOT ")) {
-    const [main, exclusion] = term.split(" NOT ");
+    const [incl, excl] = term.split(" NOT ");
     return {
-      type     : "NOT",
-      main     : parse_advanced_term(main     .trim()),
-      exclusion: parse_advanced_term(exclusion.trim())
+      type: "NOT",
+      incl: parse_advanced_term(incl.trim()),
+      excl: parse_advanced_term(excl.trim())
     };
   }
   // Check for OR next
@@ -615,7 +609,7 @@ function parse_advanced_term(term) {
   else {
     return {
       type: "PLAIN",
-      term: term.replace(/"/g, "")
+      term: term.replace(/"/g, "") // " Allows leading/trailing space, also " " possible for term
     };
   }
 }
@@ -626,11 +620,11 @@ function clean_filter_input(input) {
     .split  (',')
     .map    (term => term.trim())
     .filter (term => term) // Non-empty only
-    .filter (term => /^[a-zA-Z0-9_\-" ]+$/.test(term)) // Of allowed characters only
+    .filter (term => /^[a-zA-Z0-9._\-" ]+$/.test(term)) // Of allowed characters only
     .map    (parse_advanced_term);
 }
 
-function process_filtered_range() {
+function process_filter() {
   const process_0 = performance.now();
   const container = document.getElementById("results");
   const err_valid = '<div class="text-center text-comment">Valid dates are: YYYY / YYYY-MM / YYYY-MM-DD</div>';
@@ -776,7 +770,6 @@ function load_stat_file(date) {
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, "text/xml");
       if   (xml.querySelector("parsererror")) { throw new Error(date + " &mdash; Invalid XML format"); }
-
       return [...xml.querySelectorAll("doc")];
     });
 }
@@ -799,7 +792,7 @@ function reload_stat(date, what) {
         stat_prev_items = loaded_items;
         stat_prev_date  = date;
       }
-      process_filtered_range();
+      process_filter();
     })
     .catch(err => {
       document.getElementById("results").innerHTML =
@@ -819,11 +812,10 @@ function process_stats() {
     stat_curr_items = loaded_curr_items;
     stat_prev_items = loaded_prev_items;
 
-    process_filtered_range();
+    process_filter();
   })
   .catch(err => {
-    container.innerHTML =
-      '<div class="text-center text-comment">Error: ' + err.message + '</div>';
+    container.innerHTML = '<div class="text-center text-comment">Error: ' + err.message + '</div>';
   });
 }
 
