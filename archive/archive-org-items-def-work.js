@@ -752,9 +752,26 @@ function date_change_menu(event, what) {
     document.body.removeChild(menu_old);
   }
 
+  const i_date = stat_file_dates.indexOf(what === "curr" ? stat_curr_date : stat_prev_date);
+  const i_min  = 0;
+  const i_max  = stat_file_dates.length - 1;
+  const h_view = 3;
+  let   i_beg  = i_date - h_view;
+  let   i_end  = i_date + h_view;
+
+  if (i_beg < i_min) {
+      i_end = Math.min(i_end + (i_min - i_beg), i_max);
+      i_beg = i_min;
+  }
+  if (i_end > i_max) {
+      i_beg = Math.max(i_beg - (i_end - i_max), i_min);
+      i_end = i_max;
+  }
+
+  const d_count  = i_end - i_beg + 1;
   const rect     = event.target.getBoundingClientRect();
-  let   menu_top = rect.top    + window.scrollY - (73 + 28 * (stat_file_dates.length - 1));
-  if   (menu_top <               window.scrollY ) {
+  let   menu_top = rect.top    + window.scrollY - (45 + 28 * d_count);
+  if   (menu_top <               window.scrollY) {
         menu_top = rect.bottom + window.scrollY + 2;
   }
 
@@ -770,7 +787,8 @@ function date_change_menu(event, what) {
   menu.style.padding         = '4px';
   menu.style.boxShadow       = '2px 2px 4px rgba(0,0,0,0.2)';
 
-  stat_file_dates.forEach(date => {
+  for(let i = i_beg; i <= i_end; i++) {
+    const date     = stat_file_dates[i];
     const date_opt = document.createElement('div');
     date_opt.textContent        = date;
     date_opt.style.borderRadius = '4px';
@@ -786,7 +804,7 @@ function date_change_menu(event, what) {
       reload_stat(date, what);
     };
     menu.appendChild(date_opt);
-  });
+  }
 
   const close_opt = document.createElement('div');
   close_opt.textContent        = 'Close';
@@ -799,9 +817,7 @@ function date_change_menu(event, what) {
   close_opt.onmouseout         = () => { close_opt.style.backgroundColor = ""; }; 
 
   close_opt.onclick = function() {
-    if (document.body.contains(menu)) {
-        document.body.removeChild(menu);
-    }
+    document.body.removeChild(menu);
   };
   menu.appendChild(close_opt);
 
