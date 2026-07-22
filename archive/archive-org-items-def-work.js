@@ -303,8 +303,6 @@ function render_stats(results, date, what, container) {
        'onkeyup  ="if (event.key === \'Enter\' || event.key === \' \') { ' +
                   'date_change_menu(event, \'' + what + '\'); }" ' +
        'onclick  ="date_change_menu(event, \'' + what + '\')" ' +
-       'data-what="'    +
-             what + '"' +
        '>' + date + '</span>'        + ' : ' +
     'Min ' + min         .toFixed(3) + ' / ' +
     '10% ' + percentile10.toFixed(3) + ' / ' +
@@ -748,8 +746,7 @@ function process_filter() {
 
 function date_change_menu(event, what) {
   const menu_old = document.getElementById('date-change-menu');
-  if   (menu_old) {
-        menu_old.remove(); }
+  if   (menu_old) { menu_old.remove_ex(); }
 
   const i_date = stat_file_dates.indexOf(what === "curr" ? stat_curr_date : stat_prev_date);
   const i_min  = 0;
@@ -760,21 +757,20 @@ function date_change_menu(event, what) {
 
   if (i_beg < i_min) {
       i_end = Math.min(i_end + (i_min - i_beg), i_max);
-      i_beg = i_min;
-  }
+      i_beg = i_min; }
+
   if (i_end > i_max) {
       i_beg = Math.max(i_beg - (i_end - i_max), i_min);
-      i_end = i_max;
-  }
+      i_end = i_max; }
 
   const d_count  = i_end - i_beg + 1;
   const rect     = event.target.getBoundingClientRect();
   let   menu_top = rect.top    + window.scrollY - (45 + 28 * d_count);
-  if   (menu_top <               window.scrollY) {
-        menu_top = rect.bottom + window.scrollY + 2;
-  }
+  if   (menu_top <               window.scrollY)     {
+        menu_top = rect.bottom + window.scrollY + 2; }
 
-  const menu = document.createElement('div');
+  const menu_caller = document.activeElement;
+  const menu        = document.createElement('div');
   menu.id                    = 'date-change-menu';
   menu.style.position        = 'absolute';
   menu.style.left            = (rect.left + window.scrollX) + 'px';
@@ -787,10 +783,24 @@ function date_change_menu(event, what) {
   menu.style.boxShadow       = '2px 2px 4px rgba(0,0,0,0.2)';
   menu.setAttribute            ('role', 'menu');
 
+  menu.remove_ex = function() {
+    document.removeEventListener('click', menu.outside_click);
+    menu.remove();
+
+    if (menu_caller && document.body.contains(menu_caller)) { menu_caller.focus(); }
+  }
+
+  menu.outside_click = (e) => {
+    if (!menu.contains(e.target)) { menu.remove_ex(); }
+  }
+
+  // Defer adding until all currently pending event handlers (menu creation click) have finished
+  setTimeout(() => {
+    if (menu && document.body.contains(menu)) { document.addEventListener('click', menu.outside_click); }
+  }, 0);
+
   menu.onkeydown = (e) => {
-    if (e.key === 'Escape') {
-      menu.remove();
-    }
+    if (e.key === 'Escape') { menu.remove_ex(); }
   };
 
   const init_opt = (opt, color, text) => {
@@ -810,7 +820,7 @@ function date_change_menu(event, what) {
       if (k === 'Enter' || k === ' ') {
         e.preventDefault();
       } else {
-        if(!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(k)) return;
+        if(!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab'].includes(k)) return;
         e.preventDefault();
 
         const menu = e.currentTarget.parentElement;
@@ -818,9 +828,9 @@ function date_change_menu(event, what) {
         const curr = opts.indexOf(e.currentTarget);
         let   next;
 
-        if (k === 'ArrowUp' || k === 'ArrowLeft') {
+        if ((k === 'ArrowUp') || (k === 'ArrowLeft') || (k === 'Tab' && e.shiftKey)) {
           next = (curr - 1 + opts.length) % opts.length;
-        } else { // ArrowDown or ArrowRight
+        } else { // ArrowDown or ArrowRight or Tab
           next = (curr + 1)               % opts.length;
         }
         opts[next].focus();
@@ -841,7 +851,7 @@ function date_change_menu(event, what) {
     init_opt(date_opt, '#696969', date); // DimGray, L41
 
     date_opt.onclick = function() {
-      menu.remove();
+      menu.remove_ex();
       reload_stat(date, what);
     };
     menu.appendChild(date_opt);
@@ -851,7 +861,7 @@ function date_change_menu(event, what) {
   init_opt(close_opt, '#9e9e9e', 'Close'); // Gray62
 
   close_opt.onclick = function() {
-    menu.remove();
+    menu.remove_ex();
   };
   menu.appendChild(close_opt);
 
