@@ -149,7 +149,7 @@ function calculate_stats(filtered_items, stats_date) {
     const month      = parseInt(doc.querySelector("str[name='month']"     ).textContent, 10);
     const week       = parseInt(doc.querySelector("str[name='week']"      ).textContent, 10);
 
-    const calc_date  = new Date(stats_date + 'T12:00:00Z');
+    const calc_date  = new Date(stats_date + 'T08:00:00Z');
     const days_old   = Math.floor((calc_date - publicdate) / (24 * 60 * 60 * 1000)) - 30;
     const views_old  = downloads - month;
     const ratio_old  = parseFloat((views_old / days_old).toFixed(3));
@@ -555,25 +555,25 @@ function get_date_range(date_str) {
   if (parts.length === 1) { // Year
     const year = parts[0];
     return {
-      min: new Date(Date.UTC(year, 01-1, 01, 00, 00, 00)), // Year beg day
-      max: new Date(Date.UTC(year, 12-1, 31, 23, 59, 59))  // Year end day
+      min: new Date(Date.UTC(year, 01-1, 01, 00, 00, 00, 000)), // Year beg day
+      max: new Date(Date.UTC(year, 12-1, 31, 23, 59, 59, 999))  // Year end day
     }
   }
   if (parts.length === 2) { // Year-Month
     const [year, month] = parts;
     if (!is_date_valid(year, month, 1)) return null;
-    const e_mday = new Date(year, month,  0).getDate();
+    const e_mday = new Date(year, month, 0).getDate();
     return {
-      min: new Date(Date.UTC(year, month - 1, 1,      00, 00, 00)), // Month beg day
-      max: new Date(Date.UTC(year, month - 1, e_mday, 23, 59, 59))  // Month end day
+      min: new Date(Date.UTC(year, month - 1, 1,      00, 00, 00, 000)), // Month beg day
+      max: new Date(Date.UTC(year, month - 1, e_mday, 23, 59, 59, 999))  // Month end day
     }
   }
   if (parts.length === 3) { // Year-Month-Day
     const [year, month, day] = parts;
     if (!is_date_valid(year, month, day)) return null;
     return {
-      min: new Date(Date.UTC(year, month - 1, day, 00, 00, 00)), // Day beg
-      max: new Date(Date.UTC(year, month - 1, day, 23, 59, 59))  // Day end
+      min: new Date(Date.UTC(year, month - 1, day, 00, 00, 00, 000)), // Day beg
+      max: new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999))  // Day end
     }
   }
   return null; // Invalid format
