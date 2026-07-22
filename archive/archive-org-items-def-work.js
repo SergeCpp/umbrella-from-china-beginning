@@ -747,18 +747,22 @@ function process_filter() {
 /* Date Change */
 
 function date_change_menu(event, what) {
-  const rect = event.target.getBoundingClientRect();
-
   const menu_old = document.getElementById('date-change-menu');
   if   (menu_old) {
     document.body.removeChild(menu_old);
   }
 
+  const rect     = event.target.getBoundingClientRect();
+  let   menu_top = rect.top    + window.scrollY - (73 + 28 * (stat_file_dates.length - 1));
+  if   (menu_top <               window.scrollY ) {
+        menu_top = rect.bottom + window.scrollY + 2;
+  }
+
   const menu = document.createElement('div');
   menu.id                    = 'date-change-menu';
   menu.style.position        = 'absolute';
-  menu.style.left            = (rect.left + window.scrollX)       + 'px';
-  menu.style.top             = (rect.top  + window.scrollY - 157) + 'px'; // 3:129, 4:157, d:28
+  menu.style.left            = (rect.left + window.scrollX) + 'px';
+  menu.style.top             =  menu_top                    + 'px';
   menu.style.zIndex          = '1000';
   menu.style.backgroundColor = '#fafafa'; // Gray98
   menu.style.border          = '2px solid #ebebeb'; // Gray92
