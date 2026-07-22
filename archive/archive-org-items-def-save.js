@@ -149,8 +149,8 @@ function calculate_stats(filtered_items, stats_date) {
     const month      = parseInt(doc.querySelector("str[name='month']"     ).textContent, 10);
     const week       = parseInt(doc.querySelector("str[name='week']"      ).textContent, 10);
 
-    const calc_date  = new Date(stats_date + 'T08:00:00Z');
-    const days_old   = Math.floor((calc_date - publicdate) / (24 * 60 * 60 * 1000)) - 30;
+    const calc_date  = new Date(stats_date + "T11:59:59.999Z");
+    const days_old   = Math.round((calc_date - publicdate) / (24 * 60 * 60 * 1000)) - 30;
     const views_old  = downloads - month;
     const ratio_old  = parseFloat((views_old / days_old).toFixed(3));
 
