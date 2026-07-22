@@ -27,21 +27,17 @@ function evaluate_term(term, values, matcher) {
         evaluate_term(part, values, matcher));
 
     case "NOT":
-      const left_incl = term.incl
-                      ? evaluate_term(term.incl, values, matcher)
-                      : true; // Nothing from left (to include)
-
-      // NOTANY: Exclude if any value matches term.excl
+    case "NOTANY":
+      //  NOTANY: Exclude if any value matches term.excl
       const any_match = evaluate_term(term.excl, values, matcher);
-      return left_incl && !any_match;
+      return (!term.incl || evaluate_term(term.incl, values, matcher)) && !any_match;
 
-      /*
-      // NOTALL: Exclude if all values matches term.excl
+    case "NOTALL":
+      //  NOTALL: Exclude if all values matches term.excl
       const all_match = values.every(value => {
         return evaluate_term(term.excl, [value], matcher);
       });
-      return left_incl && !all_match;
-      */
+      return (!term.incl || evaluate_term(term.incl, values, matcher)) && !all_match;
 
     case "TEXT":
       return values.some(value => matcher(value, term.text));
@@ -610,6 +606,28 @@ function parse_term(term) {
       excl:        parse_term(excl)
     };
   }
+  // Check for NOTANY next
+  else if (term.includes("NOTANY ")) {
+    const index = term.indexOf("NOTANY ");
+    const incl  = term.substring(0, index    ); // Left
+    const excl  = term.substring(   index + 7); // Right
+    return {
+      type: "NOTANY",
+      incl: incl ? parse_term(incl) : null,
+      excl:        parse_term(excl)
+    };
+  }
+  // Check for NOTALL next
+  else if (term.includes("NOTALL ")) {
+    const index = term.indexOf("NOTALL ");
+    const incl  = term.substring(0, index    ); // Left
+    const excl  = term.substring(   index + 7); // Right
+    return {
+      type: "NOTALL",
+      incl: incl ? parse_term(incl) : null,
+      excl:        parse_term(excl)
+    };
+  }
   // Check for OR next
   else if (term.includes(" OR ")) {
     const terms = term.split(" OR ").map(part => parse_term(part));
@@ -792,8 +810,11 @@ function date_change_menu(event, what) {
 /* Main */
 
 function load_stat_file(date) {
-  const time_0  = performance.now();
-  const xml_url = "/archive/stats/archive-org-sergecpp-" + date + ".xml.txt";
+  const time_0    = performance.now();
+  const container = document.getElementById("results");
+  const xml_tmplt = container.getAttribute("data-stats");
+  const xml_regex = /#/;
+  const xml_url   = xml_tmplt.replace(xml_regex, date);
 
   return fetch(xml_url)
     .then(response => {
