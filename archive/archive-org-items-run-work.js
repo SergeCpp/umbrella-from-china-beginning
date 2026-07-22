@@ -1,7 +1,7 @@
 /* Startup Sequence */
 
 init_controls();
-
-process_stats();
+init_dates   ()
+  .then(process_stats);
 
 // EOF

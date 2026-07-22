@@ -1,18 +1,15 @@
 /* Global Variables */
 
-const stat_file_dates = ["2025-07-21",
-                         "2025-07-23",
-                         "2025-07-27",
-                         "2025-07-31"];
+const stat_file_dates = [];   // ["YYYY-MM-DD"]
 
-let   stat_curr_date  =  "2025-07-31";
+let   stat_curr_date  = null; //  "YYYY-MM-DD"
 let   stat_curr_items = [];
 
-let   stat_prev_date  =  "2025-07-27";
+let   stat_prev_date  = null; //  "YYYY-MM-DD"
 let   stat_prev_items = [];
 
-let   du_load         = 0; // Duration of load
-let   du_parse        = 0; // Duration of parse
+let   du_load         = 0;    // Duration of load
+let   du_parse        = 0;    // Duration of parse
 
 /* Items */
 
@@ -805,6 +802,36 @@ function date_change_menu(event, what) {
   menu.appendChild(close_opt);
 
   document.body.appendChild(menu);
+}
+
+/* Dates */
+
+function init_dates() {
+  const container = document.getElementById("results");
+  const dates_url = container.getAttribute("data-dates");
+
+  return fetch(dates_url)
+    .then(response => {
+      if (!response.ok) { throw new Error("Dates file not found"); }
+      return response.text();
+    })
+    .then(text => {
+      const dates_lines     = text.trim().split("\n");
+      const dates_lines_cnt = dates_lines.length;
+
+      for(let line_num = 0; line_num < dates_lines_cnt; line_num++) {
+        stat_file_dates[line_num] = dates_lines[line_num].trim();
+      }
+      stat_file_dates.sort();
+
+      stat_curr_date = stat_file_dates[stat_file_dates.length - 1];
+      stat_prev_date = stat_file_dates[stat_file_dates.length - 2];
+    })
+    .catch(err => {
+      document.getElementById("results").innerHTML =
+        '<div class="text-center text-comment">Error: ' + err.message + '</div>';
+      throw err;
+    });
 }
 
 /* Main */
