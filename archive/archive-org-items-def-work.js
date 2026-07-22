@@ -749,8 +749,7 @@ function process_filter() {
 function date_change_menu(event, what) {
   const menu_old = document.getElementById('date-change-menu');
   if   (menu_old) {
-    document.body.removeChild(menu_old);
-  }
+        menu_old.remove(); }
 
   const i_date = stat_file_dates.indexOf(what === "curr" ? stat_curr_date : stat_prev_date);
   const i_min  = 0;
@@ -786,42 +785,78 @@ function date_change_menu(event, what) {
   menu.style.borderRadius    = '4px';
   menu.style.padding         = '4px';
   menu.style.boxShadow       = '2px 2px 4px rgba(0,0,0,0.2)';
+  menu.setAttribute            ('role', 'menu');
+
+  menu.onkeydown = (e) => {
+    if (e.key === 'Escape') {
+      menu.remove();
+    }
+  };
+
+  const init_opt = (opt, color, text) => {
+    opt.style.borderRadius = '4px';
+    opt.style.padding      = '2px 4px';
+    opt.style.cursor       = 'pointer';
+    opt.style.textAlign    = 'center';
+    opt.style.color        = color;
+    opt.textContent        = text;
+    opt.tabIndex           = 0;
+    opt.setAttribute         ('role', 'menuitem');
+    opt.onmouseover        = () => { opt.style.backgroundColor = '#ebebeb'; }; // Gray92
+    opt.onmouseout         = () => { opt.style.backgroundColor = ""; };
+
+    opt.onkeydown = (e) => {
+      const k = e.key;
+      if (k === 'Enter' || k === ' ') {
+        e.preventDefault();
+      } else {
+        if(!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(k)) return;
+        e.preventDefault();
+
+        const menu = e.currentTarget.parentElement;
+        const opts = Array.from(menu.children);
+        const curr = opts.indexOf(e.currentTarget);
+        let   next;
+
+        if (k === 'ArrowUp' || k === 'ArrowLeft') {
+          next = (curr - 1 + opts.length) % opts.length;
+        } else { // ArrowDown or ArrowRight
+          next = (curr + 1)               % opts.length;
+        }
+        opts[next].focus();
+      }
+    };
+
+    opt.onkeyup = (e) => {
+      const k = e.key;
+      if (k === 'Enter' || k === ' ') {
+        opt.click();
+      }
+    };
+  };
 
   for(let i = i_beg; i <= i_end; i++) {
     const date     = stat_file_dates[i];
     const date_opt = document.createElement('div');
-    date_opt.textContent        = date;
-    date_opt.style.borderRadius = '4px';
-    date_opt.style.padding      = '2px 4px';
-    date_opt.style.cursor       = 'pointer';
-    date_opt.style.color        = '#696969'; // DimGray, L41
-    date_opt.style.textAlign    = 'center';
-    date_opt.onmouseover        = () => { date_opt.style.backgroundColor = '#ebebeb'; }; // Gray92
-    date_opt.onmouseout         = () => { date_opt.style.backgroundColor = ""; };
+    init_opt(date_opt, '#696969', date); // DimGray, L41
 
     date_opt.onclick = function() {
-      document.body.removeChild(menu);
+      menu.remove();
       reload_stat(date, what);
     };
     menu.appendChild(date_opt);
   }
 
   const close_opt = document.createElement('div');
-  close_opt.textContent        = 'Close';
-  close_opt.style.borderRadius = '4px';
-  close_opt.style.padding      = '2px 4px'; 
-  close_opt.style.cursor       = 'pointer';
-  close_opt.style.color        = '#9e9e9e'; // Gray62
-  close_opt.style.textAlign    = 'center';
-  close_opt.onmouseover        = () => { close_opt.style.backgroundColor = '#ebebeb'; }; // Gray92
-  close_opt.onmouseout         = () => { close_opt.style.backgroundColor = ""; }; 
+  init_opt(close_opt, '#9e9e9e', 'Close'); // Gray62
 
   close_opt.onclick = function() {
-    document.body.removeChild(menu);
+    menu.remove();
   };
   menu.appendChild(close_opt);
 
   document.body.appendChild(menu);
+  menu.children[i_date - i_beg].focus();
 }
 
 /* Dates */
