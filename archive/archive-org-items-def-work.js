@@ -19,19 +19,29 @@ let   du_parse        = 0; // Duration of parse
 function evaluate_term(term, values, matcher) {
   switch(term.type) {
     case "AND":
-      return term.pair.every(part => 
+      return term.terms.every(part => 
         evaluate_term(part, values, matcher));
 
     case "OR":
-      return term.pair.some(part => 
+      return term.terms.some(part => 
         evaluate_term(part, values, matcher));
 
     case "NOT":
-      const match_incl = term.incl
-                       ? evaluate_term(term.incl, values, matcher)
-                       : true; // Nothing from left (to include)
-      const match_excl = evaluate_term(term.excl, values, matcher);
-      return match_incl && !match_excl;
+      const left_incl = term.incl
+                      ? evaluate_term(term.incl, values, matcher)
+                      : true; // Nothing from left (to include)
+
+      // NOTANY: Exclude if any value matches term.excl
+      const any_match = evaluate_term(term.excl, values, matcher);
+      return left_incl && !any_match;
+
+      /*
+      // NOTALL: Exclude if all values matches term.excl
+      const all_match = values.every(value => {
+        return evaluate_term(term.excl, [value], matcher);
+      });
+      return left_incl && !all_match;
+      */
 
     case "TEXT":
       return values.some(value => matcher(value, term.text));
@@ -321,7 +331,7 @@ function render_results(results_curr, results_prev) {
   if ((results_curr.length === 0) && (results_prev.length === 0)) {
     container.innerHTML =
       '<div class="text-center text-comment">No items matched the filters</div>';
-    return;
+    return false;
   }
 
   // Lookup helper
@@ -503,6 +513,7 @@ function render_results(results_curr, results_prev) {
     wrapper  .appendChild(inner  ); // Add inner flex to wrapper
     container.appendChild(wrapper); // Add wrapper to the page
   });
+  return true;
 }
 
 /* Controls */
@@ -582,34 +593,29 @@ function parse_term(term) {
 
   // Check for AND first (higher precedence)
   if (term.includes(" AND ")) {
-    const pair = term.split(" AND ").map(part => parse_term(part));
+    const terms = term.split(" AND ").map(part => parse_term(part));
     return {
       type: "AND",
-      pair: pair
+      terms: terms
     };
   }
   // Check for NOT next
-  else if (term.substring(0, 4) === "NOT ") { // Leading NOT
-    const excl = term.substring(4);
+  else if (term.includes("NOT ")) {
+    const index = term.indexOf("NOT ");
+    const incl  = term.substring(0, index    ); // Left
+    const excl  = term.substring(   index + 4); // Right
     return {
       type: "NOT",
-      incl: null, // Nothing from left (to include)
-      excl: parse_term(excl)
-    }
-  } else if (term.includes(" NOT ")) {
-    const [incl, excl] = term.split(" NOT ");
-    return {
-      type: "NOT",
-      incl: parse_term(incl),
-      excl: parse_term(excl)
+      incl: incl ? parse_term(incl) : null,
+      excl:        parse_term(excl)
     };
   }
   // Check for OR next
   else if (term.includes(" OR ")) {
-    const pair = term.split(" OR ").map(part => parse_term(part));
+    const terms = term.split(" OR ").map(part => parse_term(part));
     return {
       type: "OR",
-      pair: pair
+      terms: terms
     };
   }
   // Plain text term (OR behavior of comma-separated terms)
@@ -710,7 +716,9 @@ function process_filter() {
   const results_prev = calculate_stats(filtered_prev_items, stat_prev_date);
   const time_2       = performance.now();
 
-  render_results(results_curr, results_prev);
+  if (!render_results(results_curr, results_prev)) {
+    return;
+  }
 
   // Timings
   const time_3        = performance.now();
@@ -785,7 +793,7 @@ function date_change_menu(event, what) {
 
 function load_stat_file(date) {
   const time_0  = performance.now();
-  const xml_url = "/archive/archive-org-sergecpp-" + date + ".xml.txt";
+  const xml_url = "/archive/stats/archive-org-sergecpp-" + date + ".xml.txt";
 
   return fetch(xml_url)
     .then(response => {
